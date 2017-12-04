@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/ethdb"
+	"database/sql"
 )
 
 func newTestLDB() (*ethdb.LDBDatabase, func()) {
@@ -190,3 +191,78 @@ func testParallelPutGet(db ethdb.Database, t *testing.T) {
 	}
 	pending.Wait()
 }
+
+
+func TestNewPostgreSQLDb(t *testing.T) {
+	//attempt to drop "psql_eth", ignore error if "psql_eth" doesn't exist
+	dropDb("psql_eth")
+
+	err := ethdb.EnsureDatabaseExists()
+	if err != nil {
+		panic("database create failed: " + err.Error())
+	}
+
+	//attempt to drop "psql_eth_table", ignore error if "psql_eth_table" doesn't exist
+	dropTable("psql_eth_table")
+
+	err = ethdb.EnsureTableExists()
+	if err != nil {
+		panic("table create failed: " + err.Error())
+	}
+}
+
+const (
+	host     = "localhost"
+	port     = 5432
+	user     = "postgres"
+	password = "postgres"
+	dbname   = "psql_eth"
+)
+
+
+func dropDb(dbName string) error {
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+		"password=%s sslmode=disable",
+		host, port, user, password)
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		return fmt.Errorf("mysql: could not get a connection: %v", err)
+	}
+
+	defer db.Close()
+
+	err = db.Ping()
+	if err!= nil {
+		return err
+	}
+
+	_, err = db.Exec("DROP DATABASE "+dbName)
+	if err!= nil {
+		return err
+	}
+	return nil
+}
+
+func dropTable(tableName string) error {
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+		"password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname)
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		return fmt.Errorf("mysql: could not get a connection: %v", err)
+	}
+
+	defer db.Close()
+
+	err = db.Ping()
+	if err!= nil {
+		return err
+	}
+
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS psql_eth(data jsonb);")
+	if err!= nil {
+		return err
+	}
+	return nil
+}
+
