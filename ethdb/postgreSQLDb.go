@@ -1,10 +1,12 @@
 package ethdb
 
 import (
-	"database/sql"
+
 	"fmt"
+	"github.com/jmoiron/sqlx"
 
 	_ "github.com/lib/pq"
+	"bytes"
 )
 
 const (
@@ -15,13 +17,35 @@ const (
 	dbname   = "psql_eth"
 )
 
+type PGSQLDatabase struct {
+	db *sqlx.DB
+} 
+
+func NewPostgreSQLDb() (*PGSQLDatabase, func(), error) {
+	//func returned as closure to close database
+	EnsureDatabaseExists()
+	EnsureTableExists()
+
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+		"password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname)
+	db, err := sqlx.Open("postgres", psqlInfo)
+	if err != nil {
+		return nil,nil, err
+	}
+	return &PGSQLDatabase{
+		db: db,
+	},func() {
+		db.Close()
+	},nil
+}
 
 //check if database exists, if not create it
 func EnsureDatabaseExists() error {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s sslmode=disable",
 		host, port, user, password)
-	db, err := sql.Open("postgres", psqlInfo)
+	db, err := sqlx.Open("postgres", psqlInfo)
 	if err != nil {
 		return fmt.Errorf("mysql: could not get a connection: %v", err)
 	}
@@ -56,7 +80,7 @@ func EnsureTableExists() error {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
-	db, err := sql.Open("postgres", psqlInfo)
+	db, err := sqlx.Open("postgres", psqlInfo)
 	if err != nil {
 		return fmt.Errorf("mysql: could not get a connection: %v", err)
 	}
@@ -75,3 +99,23 @@ func EnsureTableExists() error {
 	return nil
 }
 
+func (db *PGSQLDatabase) Put (key []byte, value []byte) error {
+	//PostgreSQL doesn't support '\x00' so trimmed them out
+	key = bytes.Trim(key, "\x00")
+	value = bytes.Trim(value, "\x00")
+	sqlStatement := `INSERT INTO psql_eth_table VALUES ($1)`
+	_, err := db.db.Exec(sqlStatement, "{\""+string(key)+"\":\""+string(value)+"\"}")
+	return err
+}
+
+func (db *PGSQLDatabase) Get (key []byte) ([]byte, error) {
+	//PostgreSQL doesn't support '\x00' so trimmed them out
+	key = bytes.Trim(key, "\x00")
+	sqlStatement := `SELECT data->>$1 FROM psql_eth_table WHERE data ->> $1 is not null;`
+	var data string
+	err := db.db.QueryRowx(sqlStatement, string(key)).Scan(&data)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(data), nil
+}

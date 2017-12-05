@@ -26,7 +26,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/ethdb"
-	"database/sql"
+	"github.com/jmoiron/sqlx"
 )
 
 func newTestLDB() (*ethdb.LDBDatabase, func()) {
@@ -45,7 +45,7 @@ func newTestLDB() (*ethdb.LDBDatabase, func()) {
 	}
 }
 
-var test_values = []string{"", "a", "1251", "\x00123\x00"}
+var test_values = []string{ "","a", "1251", "\x00123\x00"}
 
 func TestLDB_PutGet(t *testing.T) {
 	db, remove := newTestLDB()
@@ -209,6 +209,7 @@ func TestNewPostgreSQLDb(t *testing.T) {
 	if err != nil {
 		panic("table create failed: " + err.Error())
 	}
+
 }
 
 const (
@@ -224,7 +225,7 @@ func dropDb(dbName string) error {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s sslmode=disable",
 		host, port, user, password)
-	db, err := sql.Open("postgres", psqlInfo)
+	db, err := sqlx.Open("postgres", psqlInfo)
 	if err != nil {
 		return fmt.Errorf("mysql: could not get a connection: %v", err)
 	}
@@ -247,7 +248,7 @@ func dropTable(tableName string) error {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
-	db, err := sql.Open("postgres", psqlInfo)
+	db, err := sqlx.Open("postgres", psqlInfo)
 	if err != nil {
 		return fmt.Errorf("mysql: could not get a connection: %v", err)
 	}
@@ -264,5 +265,50 @@ func dropTable(tableName string) error {
 		return err
 	}
 	return nil
+}
+
+func TestPostgreSQLDb_PutGet(t *testing.T) {
+	db,remove,err := ethdb.NewPostgreSQLDb()
+	if err != nil {
+		t.Fatalf("failed to create new databse: %v", err)
+	}
+	defer remove()
+	for _, v := range test_values {
+		err := db.Put([]byte(v), []byte(v))
+		if err != nil {
+			t.Fatalf("put failed: %v", err)
+		}
+	}
+
+	for _, v := range test_values {
+		data, err := db.Get([]byte(v))
+		if err != nil {
+			t.Fatalf("get failed: %v", err)
+		}
+
+		if !bytes.Equal(data, bytes.Trim([]byte(v), "\x00")) {
+			t.Fatalf("get returned wrong result, got %q expected %q", string(data), v)
+		}
+	}
+
+	for _, v := range test_values {
+		err := db.Put([]byte(v), []byte("?"))
+		if err != nil {
+			t.Fatalf("put override failed: %v", err)
+		}
+	}
+
+	for _, v := range test_values {
+		data, err := db.Get([]byte(v))
+		if err != nil {
+			t.Fatalf("get failed: %v", err)
+		}
+		if !bytes.Equal(data, []byte("?")) {
+			t.Fatalf("get returned wrong result, got %q expected ?", string(data))
+		}
+	}
+
+
+
 }
 
