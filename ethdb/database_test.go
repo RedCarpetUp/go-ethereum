@@ -200,7 +200,7 @@ func TestNewPostgreSQLDb(t *testing.T) {
 	ethdb.EnsureDatabaseExists()
 
 	//attempt to drop "psql_eth_table", ignore error if "psql_eth_table" doesn't exist
-	dropTable("psql_eth_table")
+	dropTable()
 
 	ethdb.EnsureTableExists()
 
@@ -208,10 +208,10 @@ func TestNewPostgreSQLDb(t *testing.T) {
 }
 
 const (
-	host     = "localhost"
+	host     = "35.200.194.52"
 	port     = 5432
 	user     = "postgres"
-	password = "postgres"
+	password = "vvkaExD1rCerkG4F"
 	dbname   = "psql_eth"
 )
 
@@ -232,13 +232,11 @@ func dropDb(dbName string) {
 		panic("could not get a connection:"+err.Error())
 	}
 
-	_, err = db.Exec("DROP DATABASE "+dbName)
-	if err != nil {
-		panic("database drop failed :"+err.Error())
-	}
+	db.Exec("DROP DATABASE "+dbName)
+
 }
 
-func dropTable(tableName string) {
+func dropTable() {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
@@ -254,9 +252,13 @@ func dropTable(tableName string) {
 		panic("could not get a connection:"+err.Error())
 	}
 
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS psql_eth(data jsonb);")
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS psql_eth_table(data jsonb);")
 	if err != nil {
 		panic("Create Table failed :"+err.Error())
+	}
+	_, err = db.Exec("DROP TABLE psql_eth_table")
+	if err != nil {
+		panic("Drop Table failed :"+err.Error())
 	}
 }
 
