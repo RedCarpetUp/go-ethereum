@@ -17,11 +17,11 @@ const (
 	dbname   = "psql_eth"
 )
 
-type PGSQLDatabase struct {
+type PgSQLDatabase struct {
 	db *sqlx.DB
 } 
 
-func NewPostgreSQLDb() (*PGSQLDatabase, func(), error) {
+func NewPostgreSQLDb() (*PgSQLDatabase, func()) {
 	//func returned as closure to close database
 	EnsureDatabaseExists()
 	EnsureTableExists()
@@ -31,87 +31,97 @@ func NewPostgreSQLDb() (*PGSQLDatabase, func(), error) {
 		host, port, user, password, dbname)
 	db, err := sqlx.Open("postgres", psqlInfo)
 	if err != nil {
-		return nil,nil, err
+		panic("could not get a connection: "+err.Error())
 	}
-	return &PGSQLDatabase{
+	return &PgSQLDatabase{
 		db: db,
 	},func() {
 		db.Close()
-	},nil
-}
+	  }
+	}
 
 //check if database exists, if not create it
-func EnsureDatabaseExists() error {
+func EnsureDatabaseExists(){
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s sslmode=disable",
 		host, port, user, password)
 	db, err := sqlx.Open("postgres", psqlInfo)
 	if err != nil {
-		return fmt.Errorf("mysql: could not get a connection: %v", err)
+		panic("could not get a connection:"+err.Error())
 	}
 
 	defer db.Close()
 
 	err = db.Ping()
-	if err!= nil {
-		return err
+	if err != nil {
+		panic("could not get a connection:"+err.Error())
 	}
 
 	//database exists if res.RowsAffected() returns 1, does not exists if returns 0
 	res, err := db.Exec("SELECT 1 FROM pg_database WHERE datname = 'psql_eth';")
-	if err!= nil {
-		return err
+	if err != nil {
+		panic(err.Error())
 	}
 	exists,err := res.RowsAffected()
-	if err!= nil {
-		return err
+	if err != nil {
+		panic(err.Error())
 	}
 	if exists==0 {
 		db.Exec("CREATE DATABASE psql_eth")
-		return nil
-	} else {
-		return nil
 	}
 
 }
 
 //check if table exists, if not create it
-func EnsureTableExists() error {
+func EnsureTableExists(){
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
 	db, err := sqlx.Open("postgres", psqlInfo)
 	if err != nil {
-		return fmt.Errorf("mysql: could not get a connection: %v", err)
+		panic("Could not get a connection:"+err.Error())
 	}
 
 	defer db.Close()
 
 	err = db.Ping()
-	if err!= nil {
-		return err
+	if err != nil {
+		panic("could not get a connection:"+err.Error())
 	}
 
 	_, err = db.Exec("CREATE TABLE IF NOT EXISTS psql_eth_table(data jsonb);")
-	if err!= nil {
-		return err
+	if err != nil {
+		panic("Create table failed :"+err.Error())
 	}
-	return nil
 }
 
-func (db *PGSQLDatabase) Put (key []byte, value []byte) error {
+func (db *PgSQLDatabase) Put (key []byte, value []byte) error {
 	//PostgreSQL doesn't support '\x00' so trimmed them out
 	key = bytes.Trim(key, "\x00")
 	value = bytes.Trim(value, "\x00")
-	sqlStatement := `INSERT INTO psql_eth_table VALUES ($1)`
-	_, err := db.db.Exec(sqlStatement, "{\""+string(key)+"\":\""+string(value)+"\"}")
-	return err
+	hasKey, err := db.Has(key)
+	if err!= nil {
+		return err
+	}
+	if hasKey {
+		sqlStatement := `UPDATE psql_eth_table SET data = $1
+where data ->> $2 is not null;`
+		_, err := db.db.Exec(sqlStatement,
+			"{\""+string(key)+"\":\""+string(value)+"\"}", string(key))
+		return err
+	}else {
+		sqlStatement := `INSERT INTO psql_eth_table VALUES ($1)`
+		_, err := db.db.Exec(sqlStatement,
+			"{\""+string(key)+"\":\""+string(value)+"\"}")
+		return err
+	}
 }
 
-func (db *PGSQLDatabase) Get (key []byte) ([]byte, error) {
+func (db *PgSQLDatabase) Get (key []byte) ([]byte, error) {
 	//PostgreSQL doesn't support '\x00' so trimmed them out
 	key = bytes.Trim(key, "\x00")
-	sqlStatement := `SELECT data->>$1 FROM psql_eth_table WHERE data ->> $1 is not null;`
+	sqlStatement := `SELECT data->>$1 FROM psql_eth_table
+WHERE data ->> $1 is not null;`
 	var data string
 	err := db.db.QueryRowx(sqlStatement, string(key)).Scan(&data)
 	if err != nil {
@@ -119,3 +129,80 @@ func (db *PGSQLDatabase) Get (key []byte) ([]byte, error) {
 	}
 	return []byte(data), nil
 }
+
+func (db *PgSQLDatabase) Has (key []byte) (bool, error){
+	key = bytes.Trim(key, "\x00")
+	sqlStatement := `SELECT count(data->>$1) FROM psql_eth_table
+WHERE data ->> $1 is not null;`
+	var numRows int
+	hasKey := false
+	err := db.db.QueryRowx(sqlStatement, string(key)).Scan(&numRows)
+	if numRows!=0{
+		hasKey = true
+	}
+	return hasKey, err
+
+}
+
+func (db *PgSQLDatabase) Delete(key []byte) error{
+	key = bytes.Trim(key, "\x00")
+	sqlStatement := `DELETE FROM psql_eth_table WHERE data ->> $1 is not null;`
+	_, err := db.db.Exec(sqlStatement,string(key))
+	return err
+}
+
+func (db *PgSQLDatabase) Close() {
+	err := db.db.Close()
+	if err != nil{
+		panic(err)
+	}
+}
+
+func (db *PgSQLDatabase) NewBatch() Batch {
+	tx, err := db.db.Beginx()
+	if err != nil{
+		panic(err)
+	}
+	return &psqlBatch{tx:tx}
+}
+
+
+type psqlBatch struct {
+	db   *PgSQLDatabase
+	tx   *sqlx.Tx
+	size int
+}
+
+func (b *psqlBatch) Put(key []byte, value []byte) error  {
+	//PostgreSQL doesn't support '\x00' so trimmed them out
+	key = bytes.Trim(key, "\x00")
+	value = bytes.Trim(value, "\x00")
+	hasKey, err := b.db.Has(key)
+	if err!= nil {
+		return err
+	}
+	if hasKey {
+		sqlStatement := `UPDATE psql_eth_table SET data = $1
+where data ->> $2 is not null;`
+		_, err := b.tx.Exec(sqlStatement,
+			"{\""+string(key)+"\":\""+string(value)+"\"}", string(key))
+		b.size += len(value)
+		return err
+	}else {
+		sqlStatement := `INSERT INTO psql_eth_table VALUES ($1)`
+		_, err := b.tx.Exec(sqlStatement,
+			"{\""+string(key)+"\":\""+string(value)+"\"}")
+		b.size += len(value)
+		return err
+	}
+}
+
+func (b *psqlBatch) Write() error  {
+	err := b.tx.Commit()
+	return err
+}
+
+func (b *psqlBatch) ValueSize() int  {
+	return b.size
+}
+

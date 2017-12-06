@@ -197,18 +197,13 @@ func TestNewPostgreSQLDb(t *testing.T) {
 	//attempt to drop "psql_eth", ignore error if "psql_eth" doesn't exist
 	dropDb("psql_eth")
 
-	err := ethdb.EnsureDatabaseExists()
-	if err != nil {
-		panic("database create failed: " + err.Error())
-	}
+	ethdb.EnsureDatabaseExists()
 
 	//attempt to drop "psql_eth_table", ignore error if "psql_eth_table" doesn't exist
 	dropTable("psql_eth_table")
 
-	err = ethdb.EnsureTableExists()
-	if err != nil {
-		panic("table create failed: " + err.Error())
-	}
+	ethdb.EnsureTableExists()
+
 
 }
 
@@ -221,58 +216,60 @@ const (
 )
 
 
-func dropDb(dbName string) error {
+func dropDb(dbName string) {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s sslmode=disable",
 		host, port, user, password)
 	db, err := sqlx.Open("postgres", psqlInfo)
 	if err != nil {
-		return fmt.Errorf("mysql: could not get a connection: %v", err)
+		panic("could not get a connection:"+err.Error())
 	}
 
 	defer db.Close()
 
 	err = db.Ping()
-	if err!= nil {
-		return err
+	if err != nil {
+		panic("could not get a connection:"+err.Error())
 	}
 
 	_, err = db.Exec("DROP DATABASE "+dbName)
-	if err!= nil {
-		return err
+	if err != nil {
+		panic("database drop failed :"+err.Error())
 	}
-	return nil
 }
 
-func dropTable(tableName string) error {
+func dropTable(tableName string) {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
 	db, err := sqlx.Open("postgres", psqlInfo)
 	if err != nil {
-		return fmt.Errorf("mysql: could not get a connection: %v", err)
+		panic("could not get a connection:"+err.Error())
 	}
 
 	defer db.Close()
 
 	err = db.Ping()
-	if err!= nil {
-		return err
+	if err != nil {
+		panic("could not get a connection:"+err.Error())
 	}
 
 	_, err = db.Exec("CREATE TABLE IF NOT EXISTS psql_eth(data jsonb);")
-	if err!= nil {
-		return err
+	if err != nil {
+		panic("Create Table failed :"+err.Error())
 	}
-	return nil
 }
 
 func TestPostgreSQLDb_PutGet(t *testing.T) {
-	db,remove,err := ethdb.NewPostgreSQLDb()
-	if err != nil {
-		t.Fatalf("failed to create new databse: %v", err)
-	}
+	db,remove := ethdb.NewPostgreSQLDb()
 	defer remove()
+	testPutGetPostgres(db, t)
+
+}
+
+func testPutGetPostgres(db ethdb.Database, t *testing.T) {
+	t.Parallel()
+
 	for _, v := range test_values {
 		err := db.Put([]byte(v), []byte(v))
 		if err != nil {
@@ -285,7 +282,6 @@ func TestPostgreSQLDb_PutGet(t *testing.T) {
 		if err != nil {
 			t.Fatalf("get failed: %v", err)
 		}
-
 		if !bytes.Equal(data, bytes.Trim([]byte(v), "\x00")) {
 			t.Fatalf("get returned wrong result, got %q expected %q", string(data), v)
 		}
@@ -308,7 +304,38 @@ func TestPostgreSQLDb_PutGet(t *testing.T) {
 		}
 	}
 
+	for _, v := range test_values {
+		orig, err := db.Get([]byte(v))
+		if err != nil {
+			t.Fatalf("get failed: %v", err)
+		}
+		orig[0] = byte(0xff)
+		data, err := db.Get([]byte(v))
+		if err != nil {
+			t.Fatalf("get failed: %v", err)
+		}
+		if !bytes.Equal(data, []byte("?")) {
+			t.Fatalf("get returned wrong result, got %q expected ?", string(data))
+		}
+	}
 
+	for _, v := range test_values {
+		err := db.Delete([]byte(v))
+		if err != nil {
+			t.Fatalf("delete %q failed: %v", v, err)
+		}
+	}
 
+	for _, v := range test_values {
+		_, err := db.Get([]byte(v))
+		if err == nil {
+			t.Fatalf("got deleted value %q", v)
+		}
+	}
 }
 
+func TestPostgre_ParallelPutGet(t *testing.T) {
+	db,remove := ethdb.NewPostgreSQLDb()
+	defer remove()
+	testParallelPutGet(db, t)
+}
