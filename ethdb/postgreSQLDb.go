@@ -3,10 +3,10 @@ package ethdb
 import (
 
 	"fmt"
-	"github.com/jmoiron/sqlx"
 
 	_ "github.com/lib/pq"
 	"bytes"
+	"database/sql"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 )
 
 type PgSQLDatabase struct {
-	db *sqlx.DB
+	db *sql.DB
 } 
 
 func NewPostgreSQLDb() (*PgSQLDatabase, func()) {
@@ -29,7 +29,7 @@ func NewPostgreSQLDb() (*PgSQLDatabase, func()) {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
-	db, err := sqlx.Open("postgres", psqlInfo)
+	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		panic("could not get a connection: "+err.Error())
 	}
@@ -45,7 +45,7 @@ func EnsureDatabaseExists(){
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s sslmode=disable",
 		host, port, user, password)
-	db, err := sqlx.Open("postgres", psqlInfo)
+	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		panic("could not get a connection:"+err.Error())
 	}
@@ -77,7 +77,7 @@ func EnsureTableExists(){
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
-	db, err := sqlx.Open("postgres", psqlInfo)
+	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		panic("Could not get a connection:"+err.Error())
 	}
@@ -123,7 +123,7 @@ func (db *PgSQLDatabase) Get (key []byte) ([]byte, error) {
 	sqlStatement := `SELECT data->>$1 FROM psql_eth_table
 WHERE data ->> $1 is not null;`
 	var data string
-	err := db.db.QueryRowx(sqlStatement, string(key)).Scan(&data)
+	err := db.db.QueryRow(sqlStatement, string(key)).Scan(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (db *PgSQLDatabase) Has (key []byte) (bool, error){
 WHERE data ->> $1 is not null;`
 	var numRows int
 	hasKey := false
-	err := db.db.QueryRowx(sqlStatement, string(key)).Scan(&numRows)
+	err := db.db.QueryRow(sqlStatement, string(key)).Scan(&numRows)
 	if numRows!=0{
 		hasKey = true
 	}
@@ -159,7 +159,7 @@ func (db *PgSQLDatabase) Close() {
 }
 
 func (db *PgSQLDatabase) NewBatch() Batch {
-	tx, err := db.db.Beginx()
+	tx, err := db.db.Begin()
 	if err != nil{
 		panic(err)
 	}
@@ -169,7 +169,7 @@ func (db *PgSQLDatabase) NewBatch() Batch {
 
 type psqlBatch struct {
 	db   *PgSQLDatabase
-	tx   *sqlx.Tx
+	tx   *sql.Tx
 	size int
 }
 

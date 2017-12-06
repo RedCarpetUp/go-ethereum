@@ -26,7 +26,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/jmoiron/sqlx"
+	"database/sql"
 )
 
 func newTestLDB() (*ethdb.LDBDatabase, func()) {
@@ -220,7 +220,7 @@ func dropDb(dbName string) {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s sslmode=disable",
 		host, port, user, password)
-	db, err := sqlx.Open("postgres", psqlInfo)
+	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		panic("could not get a connection:"+err.Error())
 	}
@@ -242,7 +242,7 @@ func dropTable(tableName string) {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
-	db, err := sqlx.Open("postgres", psqlInfo)
+	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		panic("could not get a connection:"+err.Error())
 	}
