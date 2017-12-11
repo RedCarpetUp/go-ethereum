@@ -263,8 +263,11 @@ func dropTable() {
 }
 
 func TestPostgreSQLDb_PutGet(t *testing.T) {
-	db,remove := ethdb.NewPostgreSQLDb()
-	defer remove()
+	db,err := ethdb.NewPostgreSQLDb()
+	if err != nil {
+		t.Fatalf("New database create failed: "+ err.Error())
+	}
+	defer db.Close()
 	testPutGetPostgres(db, t)
 
 }
@@ -337,7 +340,10 @@ func testPutGetPostgres(db ethdb.Database, t *testing.T) {
 }
 
 func TestPostgre_ParallelPutGet(t *testing.T) {
-	db,remove := ethdb.NewPostgreSQLDb()
-	defer remove()
+	db,err := ethdb.NewPostgreSQLDb()
+	if err != nil {
+		t.Fatalf("New database create failed: "+ err.Error())
+	}
+	defer db.Close()
 	testParallelPutGet(db, t)
 }
