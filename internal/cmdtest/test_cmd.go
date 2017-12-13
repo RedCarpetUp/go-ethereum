@@ -208,7 +208,9 @@ func (tt *TestCmd) Kill() {
 }
 
 func (tt *TestCmd) withKillTimeout(fn func()) {
-	timeout := time.AfterFunc(5*time.Second, func() {
+	//main testnet block chain config save to database at core/genesis.go line-152
+	// SetupGenesisBlock() is taking too much time (10-20 minutes) to save to postgres
+	timeout := time.AfterFunc(5000*time.Second, func() {
 		tt.Log("killing the child process (timeout)")
 		tt.Kill()
 	})

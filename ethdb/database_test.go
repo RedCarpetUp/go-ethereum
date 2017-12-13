@@ -287,7 +287,7 @@ func testPutGetPostgres(db ethdb.Database, t *testing.T) {
 		if err != nil {
 			t.Fatalf("get failed: %v", err)
 		}
-		if !bytes.Equal(data, bytes.Trim([]byte(v), "\x00")) {
+		if !bytes.Equal(data, []byte(v)) {
 			t.Fatalf("get returned wrong result, got %q expected %q", string(data), v)
 		}
 	}
