@@ -1,5 +1,7 @@
 package ethdb
 
+//TODO database not SQL injection secure
+
 import (
 
 	"fmt"
@@ -7,6 +9,8 @@ import (
 	_ "github.com/lib/pq"
 	"database/sql"
 	"encoding/base64"
+	"github.com/ethereum/go-ethereum/log"
+	"strings"
 )
 
 const (
@@ -19,12 +23,15 @@ const (
 
 type PgSQLDatabase struct {
 	db *sql.DB
+	tableName string
 } 
 
-func NewPostgreSQLDb() (*PgSQLDatabase, error) {
-	//func returned as closure to close database
+func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
+	//this removes '/', '-' from string
+	tableName = strings.Replace(tableName,"/","",-1)
+	tableName = strings.Replace(tableName,"-","",-1)
 	EnsureDatabaseExists()
-	EnsureTableExists()
+	EnsureTableExists(tableName)
 
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
@@ -36,6 +43,7 @@ func NewPostgreSQLDb() (*PgSQLDatabase, error) {
 
 	return &PgSQLDatabase{
 		db: db,
+		tableName:tableName,
 	},nil
 }
 
@@ -59,20 +67,24 @@ func EnsureDatabaseExists(){
 	//database exists if res.RowsAffected() returns 1, does not exists if returns 0
 	res, err := db.Exec("SELECT 1 FROM pg_database WHERE datname = 'psql_eth';")
 	if err != nil {
-		panic(err.Error())
+		panic(err)
 	}
 	exists,err := res.RowsAffected()
 	if err != nil {
-		panic(err.Error())
+		panic(err)
 	}
 	if exists==0 {
-		db.Exec("CREATE DATABASE psql_eth")
+		_, err := db.Exec("CREATE DATABASE psql_eth")
+		if err != nil{
+			panic(err)
+		}
+		log.Info("created db")
 	}
 
 }
 
 //check if table exists, if not create it
-func EnsureTableExists(){
+func EnsureTableExists(tableName string){
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
@@ -88,7 +100,7 @@ func EnsureTableExists(){
 		panic("could not get a connection:"+err.Error())
 	}
 
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS psql_eth_table(data jsonb);")
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS `+tableName+`(data jsonb)`)
 	if err != nil {
 		panic("Create table failed :"+err.Error())
 	}
@@ -102,13 +114,13 @@ func (db *PgSQLDatabase) Put (key []byte, value []byte) error {
 		return err
 	}
 	if hasKey {
-		sqlStatement := `UPDATE psql_eth_table SET data = $1
+		sqlStatement := `UPDATE `+db.tableName+` SET data = $1
 where data ->> $2 is not null;`
 		_, err := db.db.Exec(sqlStatement,
 			"{\""+keyBase64+"\":\""+valueBase64+"\"}", keyBase64)
 		return err
 	}else {
-		sqlStatement := `INSERT INTO psql_eth_table VALUES ($1)`
+		sqlStatement := `INSERT INTO `+db.tableName+` VALUES ($1)`
 		_, err := db.db.Exec(sqlStatement,
 			"{\""+keyBase64+"\":\""+valueBase64+"\"}")
 		return err
@@ -117,7 +129,7 @@ where data ->> $2 is not null;`
 
 func (db *PgSQLDatabase) Get (key []byte) ([]byte, error) {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := `SELECT data->>$1 FROM psql_eth_table
+	sqlStatement := `SELECT data->>$1 FROM `+db.tableName+`
 WHERE data ->> $1 is not null;`
 	var data string
 	err := db.db.QueryRow(sqlStatement, keyBase64).Scan(&data)
@@ -133,7 +145,7 @@ WHERE data ->> $1 is not null;`
 
 func (db *PgSQLDatabase) Has (key []byte) (bool, error){
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := `SELECT count(data->>$1) FROM psql_eth_table
+	sqlStatement := `SELECT count(data->>$1) FROM `+db.tableName+`
 WHERE data ->> $1 is not null;`
 	var numRows int
 	hasKey := false
@@ -147,7 +159,7 @@ WHERE data ->> $1 is not null;`
 
 func (db *PgSQLDatabase) Delete(key []byte) error{
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := `DELETE FROM psql_eth_table WHERE data ->> $1 is not null;`
+	sqlStatement := `DELETE FROM `+db.tableName+` WHERE data ->> $1 is not null;`
 	_, err := db.db.Exec(sqlStatement,keyBase64)
 	return err
 }
@@ -182,14 +194,14 @@ func (b *psqlBatch) Put(key []byte, value []byte) error  {
 		return err
 	}
 	if hasKey {
-		sqlStatement := `UPDATE psql_eth_table SET data = $1
+		sqlStatement := `UPDATE `+b.db.tableName+` SET data = $1
 where data ->> $2 is not null;`
 		_, err := b.tx.Exec(sqlStatement,
 			"{\""+keyBase64+"\":\""+valueBase64+"\"}", keyBase64)
 		b.size += len(value)
 		return err
 	}else {
-		sqlStatement := `INSERT INTO psql_eth_table VALUES ($1)`
+		sqlStatement := `INSERT INTO `+b.db.tableName+` VALUES ($1)`
 		_, err := b.tx.Exec(sqlStatement,
 			"{\""+keyBase64+"\":\""+valueBase64+"\"}")
 		b.size += len(value)

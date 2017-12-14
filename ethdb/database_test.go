@@ -202,7 +202,7 @@ func TestNewPostgreSQLDb(t *testing.T) {
 	//attempt to drop "psql_eth_table", ignore error if "psql_eth_table" doesn't exist
 	dropTable()
 
-	ethdb.EnsureTableExists()
+	ethdb.EnsureTableExists("test_table")
 
 
 }
@@ -263,7 +263,7 @@ func dropTable() {
 }
 
 func TestPostgreSQLDb_PutGet(t *testing.T) {
-	db,err := ethdb.NewPostgreSQLDb()
+	db,err := ethdb.NewPostgreSQLDb("test_table")
 	if err != nil {
 		t.Fatalf("New database create failed: "+ err.Error())
 	}
@@ -340,7 +340,7 @@ func testPutGetPostgres(db ethdb.Database, t *testing.T) {
 }
 
 func TestPostgre_ParallelPutGet(t *testing.T) {
-	db,err := ethdb.NewPostgreSQLDb()
+	db,err := ethdb.NewPostgreSQLDb("test_table")
 	if err != nil {
 		t.Fatalf("New database create failed: "+ err.Error())
 	}

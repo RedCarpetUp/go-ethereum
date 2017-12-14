@@ -301,7 +301,9 @@ func copyDb(ctx *cli.Context) error {
 
 	// Create a source peer to satisfy downloader requests from
 	//db, err := ethdb.NewLDBDatabase(ctx.Args().First(), ctx.GlobalInt(utils.CacheFlag.Name), 256)
-	db,err := ethdb.NewPostgreSQLDb()
+
+	db,err := ethdb.NewPostgreSQLDb(ctx.Args().First())
+
 	if err != nil {
 		return err
 	}

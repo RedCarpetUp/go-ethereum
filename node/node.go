@@ -646,7 +646,7 @@ func (n *Node) OpenDatabase(name string, cache, handles int) (ethdb.Database, er
 	if n.config.DataDir == "" {
 		return ethdb.NewMemDatabase()
 	}
-	return ethdb.NewPostgreSQLDb()
+	return ethdb.NewPostgreSQLDb(n.config.resolvePath(name))
 	//return ethdb.NewLDBDatabase(n.config.resolvePath(name), cache, handles)
 }
 
