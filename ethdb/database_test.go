@@ -252,11 +252,11 @@ func dropTable() {
 		panic("could not get a connection:"+err.Error())
 	}
 
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS psql_eth_table(data jsonb);")
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS test_table(data jsonb);")
 	if err != nil {
 		panic("Create Table failed :"+err.Error())
 	}
-	_, err = db.Exec("DROP TABLE psql_eth_table")
+	_, err = db.Exec("DROP TABLE test_table")
 	if err != nil {
 		panic("Drop Table failed :"+err.Error())
 	}
@@ -346,4 +346,70 @@ func TestPostgre_ParallelPutGet(t *testing.T) {
 	}
 	defer db.Close()
 	testParallelPutGet(db, t)
+}
+
+func TestPgSQLIterator(t *testing.T) {
+	db,err := ethdb.NewPostgreSQLDb("test_table")
+	if err != nil {
+		t.Fatalf("New database create failed: "+ err.Error())
+	}
+	defer db.Close()
+	testPostgresIterator(db,t)
+}
+
+//temporary test cases
+//TODO rewrite them
+func testPostgresIterator(db *ethdb.PgSQLDatabase, t *testing.T)  {
+	for _, v := range test_values {
+		err := db.Put([]byte(v), []byte(v))
+		if err != nil {
+			t.Fatalf("put failed: %v", err)
+		}
+	}
+
+	it := db.NewIterator()
+	it.First()
+	if !(bytes.Equal(it.Key(), []byte(""))){
+		t.Fatalf(string(it.Key()))
+	}
+	it.Next()
+	if !(bytes.Equal(it.Key(), []byte("\x00123\x00"))){
+		t.Fatalf("next failed")
+	}
+	it.Next()
+	if !(bytes.Equal(it.Key(), []byte("1251"))){
+		t.Fatalf("next failed")
+	}
+
+	it.Last()
+	if !(bytes.Equal(it.Key(), []byte("a"))){
+		t.Fatalf("last failed")
+	}
+
+	it.Prev()
+	if !(bytes.Equal(it.Key(), []byte("1251"))){
+		t.Fatalf("prev failed")
+	}
+	it.Prev()
+	if !(bytes.Equal(it.Key(), []byte("\x00123\x00"))){
+		t.Fatalf("prev failed")
+	}
+
+	it.Seek([]byte("1251"))
+	if !(bytes.Equal(it.Value(), []byte("1251"))){
+		t.Fatalf("seek failed")
+	}
+	it.Next()
+	if !(bytes.Equal(it.Key(), []byte("a"))){
+		t.Fatalf("next failed")
+	}
+	it.Next()
+	if !(bytes.Equal(it.Key(), []byte("a"))){
+		t.Fatalf("next failed")
+	}
+
+	it.Prev()
+	if !(bytes.Equal(it.Key(), []byte("1251"))){
+		t.Fatalf("prev failed")
+	}
 }

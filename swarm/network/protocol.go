@@ -43,6 +43,7 @@ import (
 	bzzswap "github.com/ethereum/go-ethereum/swarm/services/swap"
 	"github.com/ethereum/go-ethereum/swarm/services/swap/swap"
 	"github.com/ethereum/go-ethereum/swarm/storage"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const (
@@ -58,7 +59,8 @@ type bzz struct {
 	storage    StorageHandler       // handler storage/retrieval related requests coming via the bzz wire protocol
 	hive       *Hive                // the logistic manager, peerPool, routing service and peer handler
 	dbAccess   *DbAccess            // access to db storage counter and iterator for syncing
-	requestDb  *storage.LDBDatabase // db to persist backlog of deliveries to aid syncing
+	//requestDb  *storage.LDBDatabase // db to persist backlog of deliveries to aid syncing
+	requestDb  *ethdb.PgSQLDatabase // db to persist backlog of deliveries to aid syncing
 	remoteAddr *peerAddr            // remote peers address
 	peer       *p2p.Peer            // the p2p peer object
 	rw         p2p.MsgReadWriter    // messageReadWriter to send messages to
@@ -100,7 +102,8 @@ func Bzz(cloud StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess 
 
 	// a single global request db is created for all peer connections
 	// this is to persist delivery backlog and aid syncronisation
-	requestDb, err := storage.NewLDBDatabase(sy.RequestDbPath)
+	//requestDb, err := storage.NewLDBDatabase(sy.RequestDbPath)
+	requestDb, err := ethdb.NewPostgreSQLDb(sy.RequestDbPath)
 	if err != nil {
 		return p2p.Protocol{}, fmt.Errorf("error setting up request db: %v", err)
 	}
@@ -129,7 +132,8 @@ the main protocol loop that
  * whenever the loop terminates, the peer will disconnect with Subprotocol error
  * whenever handlers return an error the loop terminates
 */
-func run(requestDb *storage.LDBDatabase, depo StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64, p *p2p.Peer, rw p2p.MsgReadWriter) (err error) {
+//func run(requestDb *storage.LDBDatabase, depo StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64, p *p2p.Peer, rw p2p.MsgReadWriter) (err error) {
+func run(requestDb *ethdb.PgSQLDatabase, depo StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64, p *p2p.Peer, rw p2p.MsgReadWriter) (err error) {
 
 	self := &bzz{
 		storage:     depo,

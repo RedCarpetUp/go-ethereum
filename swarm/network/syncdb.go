@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/swarm/storage"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const counterKeyPrefix = 0x01
@@ -46,7 +47,8 @@ type syncDb struct {
 	counterKey     []byte               // db key to persist counter
 	priority       uint                 // priotity High|Medium|Low
 	buffer         chan interface{}     // incoming request channel
-	db             *storage.LDBDatabase // underlying db (TODO should be interface)
+	//db             *storage.LDBDatabase // underlying db (TODO should be interface)
+	db             *ethdb.PgSQLDatabase // underlying db (TODO should be interface)
 	done           chan bool            // chan to signal goroutines finished quitting
 	quit           chan bool            // chan to signal quitting to goroutines
 	total, dbTotal int                  // counts for one session
@@ -58,7 +60,8 @@ type syncDb struct {
 // priority is used in the index key
 // uses a buffer and a leveldb for persistent storage
 // bufferSize, dbBatchSize are config parameters
-func newSyncDb(db *storage.LDBDatabase, key storage.Key, priority uint, bufferSize, dbBatchSize uint, deliver func(interface{}, chan bool) bool) *syncDb {
+//func newSyncDb(db *storage.LDBDatabase, key storage.Key, priority uint, bufferSize, dbBatchSize uint, deliver func(interface{}, chan bool) bool) *syncDb {
+func newSyncDb(db *ethdb.PgSQLDatabase, key storage.Key, priority uint, bufferSize, dbBatchSize uint, deliver func(interface{}, chan bool) bool) *syncDb {
 	start := make([]byte, 42)
 	start[1] = byte(priorities - priority)
 	copy(start[2:34], key)

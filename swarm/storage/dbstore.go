@@ -36,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const (
@@ -64,7 +65,7 @@ type gcItem struct {
 }
 
 type DbStore struct {
-	db *LDBDatabase
+	db *ethdb.PgSQLDatabase
 
 	// this should be stored in db, accessed transactionally
 	entryCnt, accessCnt, dataIdx, capacity uint64
@@ -82,7 +83,8 @@ func NewDbStore(path string, hash SwarmHasher, capacity uint64, radius int) (s *
 
 	s.hashfunc = hash
 
-	s.db, err = NewLDBDatabase(path)
+	//s.db, err = NewLDBDatabase(path)
+	s.db, err = ethdb.NewPostgreSQLDb(path)
 	if err != nil {
 		return
 	}
