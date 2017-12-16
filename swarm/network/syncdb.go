@@ -22,7 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/storage"
-	"github.com/syndtr/goleveldb/leveldb"
+	//"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/ethereum/go-ethereum/ethdb"
 )
@@ -117,7 +117,8 @@ func (self *syncDb) bufferRead(deliver func(interface{}, chan bool) bool) {
 	var req interface{}
 	var entry *syncDbEntry
 	var inBatch, inDb int
-	batch := new(leveldb.Batch)
+	batch := self.db.NewBatchPgsql()
+	//batch := new(leveldb.Batch)
 	var dbSize chan int
 	quit := self.quit
 	counterValue := make([]byte, 8)
@@ -236,13 +237,14 @@ LOOP:
 }
 
 // writes the batch to the db and returns a new batch object
-func (self *syncDb) writeSyncBatch(batch *leveldb.Batch) *leveldb.Batch {
+func (self *syncDb) writeSyncBatch(batch *ethdb.PsqlBatch) *ethdb.PsqlBatch {
 	err := self.db.Write(batch)
 	if err != nil {
 		log.Warn(fmt.Sprintf("syncDb[%v/%v] saving batch to db failed: %v", self.key.Log(), self.priority, err))
 		return batch
 	}
-	return new(leveldb.Batch)
+	return self.db.NewBatchPgsql()
+	//return new(leveldb.Batch)
 }
 
 // abstract type for db entries (TODO could be a feature of Receipts)
@@ -283,7 +285,8 @@ func (self *syncDb) dbRead(useBatches bool, counter uint64, fun func(interface{}
 	var more bool
 	var entry *syncDbEntry
 	var it iterator.Iterator
-	var del *leveldb.Batch
+	//var del *leveldb.Batch
+	var del *ethdb.PsqlBatch
 	batchSizes := make(chan int)
 
 	for {
@@ -312,7 +315,8 @@ func (self *syncDb) dbRead(useBatches bool, counter uint64, fun func(interface{}
 			useBatches = true
 			continue
 		}
-		del = new(leveldb.Batch)
+		//del = new(leveldb.Batch)
+		del = self.db.NewBatchPgsql()
 		log.Trace(fmt.Sprintf("syncDb[%v/%v]: new iterator: %x (batch %v, count %v)", self.key.Log(), self.priority, key, batches, cnt))
 
 		for n = 0; !useBatches || n < cnt; it.Next() {

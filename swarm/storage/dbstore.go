@@ -34,7 +34,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/syndtr/goleveldb/leveldb"
+	//"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/ethereum/go-ethereum/ethdb"
 )
@@ -382,7 +382,8 @@ func (s *DbStore) Cleanup() {
 }
 
 func (s *DbStore) delete(idx uint64, idxKey []byte) {
-	batch := new(leveldb.Batch)
+	//batch := new(leveldb.Batch)
+	batch := s.db.NewBatchPgsql()
 	batch.Delete(idxKey)
 	batch.Delete(getDataKey(idx))
 	s.entryCnt--
@@ -418,7 +419,8 @@ func (s *DbStore) Put(chunk *Chunk) {
 		s.collectGarbage(gcArrayFreeRatio)
 	}
 
-	batch := new(leveldb.Batch)
+	//batch := new(leveldb.Batch)
+	batch := s.db.NewBatchPgsql()
 
 	batch.Put(getDataKey(s.dataIdx), data)
 
@@ -450,7 +452,8 @@ func (s *DbStore) tryAccessIdx(ikey []byte, index *dpaDBIndex) bool {
 	}
 	decodeIndex(idata, index)
 
-	batch := new(leveldb.Batch)
+	// batch := new(leveldb.Batch)
+	batch := s.db.NewBatchPgsql()
 
 	batch.Put(keyAccessCnt, U64ToBytes(s.accessCnt))
 	s.accessCnt++

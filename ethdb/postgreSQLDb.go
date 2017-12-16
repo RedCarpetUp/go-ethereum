@@ -176,22 +176,40 @@ func (db *PgSQLDatabase) Close() {
 	}
 }
 
+func (self *PgSQLDatabase) Write(batch *PsqlBatch) error {
+	return batch.Write()
+}
+
 func (db *PgSQLDatabase) NewBatch() Batch {
 	tx, err := db.db.Begin()
 	if err != nil{
 		panic(err)
 	}
-	return &psqlBatch{tx:tx}
+	return &PsqlBatch{
+		db: db,
+		tx:tx,
+		}
+}
+
+func (db *PgSQLDatabase) NewBatchPgsql() *PsqlBatch {
+	tx, err := db.db.Begin()
+	if err != nil{
+		panic(err)
+	}
+	return &PsqlBatch{
+		db: db,
+		tx:tx,
+		}
 }
 
 
-type psqlBatch struct {
+type PsqlBatch struct {
 	db   *PgSQLDatabase
 	tx   *sql.Tx
 	size int
 }
 
-func (b *psqlBatch) Put(key []byte, value []byte) error  {
+func (b *PsqlBatch) Put(key []byte, value []byte) error  {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	valueBase64 := base64.StdEncoding.EncodeToString(value)
 	hasKey, err := b.db.Has(key)
@@ -214,12 +232,20 @@ where data ->> $2 is not null;`
 	}
 }
 
-func (b *psqlBatch) Write() error  {
+func (b *PsqlBatch) Delete(key []byte) error{
+	keyBase64 := base64.StdEncoding.EncodeToString(key)
+	sqlStatement := `DELETE FROM `+b.db.tableName+` WHERE data ->> $1 is not null;`
+	_, err := b.tx.Exec(sqlStatement,keyBase64)
+	b.size += 1
+	return err
+}
+
+func (b *PsqlBatch) Write() error  {
 	err := b.tx.Commit()
 	return err
 }
 
-func (b *psqlBatch) ValueSize() int  {
+func (b *PsqlBatch) ValueSize() int  {
 	return b.size
 }
 
