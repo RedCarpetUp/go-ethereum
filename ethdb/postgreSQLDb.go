@@ -430,33 +430,50 @@ func (i *PgSQLIterator) Prev() bool {
 }
 
 func (i *PgSQLIterator) Seek(key []byte) bool {
-	i.First()
+	var dataString string
+	var indexString string
+	var jsonMap map[string]string
 
-	var totalString string
-	var totalInt int
+	keyBase64 := base64.StdEncoding.EncodeToString(key)
+	sqlStatement := "SELECT data, index FROM (SELECT data, row_number() OVER(ORDER BY data ASC) AS INDEX FROM "+i.db.tableName+") As data WHERE data ->> '"+keyBase64+"' is not null;"
+	err := i.db.db.QueryRow(sqlStatement).Scan(&dataString,&indexString)
 
-	sqlStatementLast := "SELECT count(*) FROM " + i.db.tableName
-	err := i.db.db.QueryRow(sqlStatementLast).Scan(&totalString)
-	if err != nil{
-		i.err = err
-		return false
-	}
-
-	totalInt, err = strconv.Atoi(totalString)
-	if err != nil{
-		i.err = err
-		return false
-	}
-
-
-	for j:=0; j<totalInt-1; j++{
-		if string(i.key) >= string(key) {
-			i.key = key
-			i.offset = j
-			return true
+	if err!=nil{
+		if err.Error() == "sql: no rows in result set"{
+			return false
 		}
-		i.Next()
+		i.err = err
+		return false
 	}
+
+	err = json.Unmarshal([]byte(dataString), &jsonMap)
+	if err != nil {
+		i.err = err
+		return false
+	}
+
+	for key, value := range jsonMap {
+		// loop will run exactly once, as jsonMap contains only one item
+		keyDecoded, err := base64.StdEncoding.DecodeString(key)
+		if err!= nil{
+			i.err = err
+			return false
+		}
+		valueDecoded, err := base64.StdEncoding.DecodeString(value)
+		if err!= nil{
+			i.err = err
+			return false
+		}
+		i.key = []byte(keyDecoded)
+		i.value = []byte(valueDecoded)
+	}
+	indexInt, err := strconv.Atoi(indexString)
+	i.offset = indexInt-1
+	if err!= nil{
+		i.err = err
+		return false
+	}
+
 	return true
 }
 
