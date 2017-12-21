@@ -138,6 +138,9 @@ type Config struct {
 
 	// Logger is a custom logger to use with the p2p.Server.
 	Logger log.Logger
+
+	PSQL bool
+	//set to use PostgreSQL as default
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into

@@ -119,6 +119,7 @@ var (
 		utils.GpoPercentileFlag,
 		utils.ExtraDataFlag,
 		configFileFlag,
+		utils.PsqlFlag,
 	}
 
 	rpcFlags = []cli.Flag{

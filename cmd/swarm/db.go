@@ -34,7 +34,7 @@ func dbExport(ctx *cli.Context) {
 		utils.Fatalf("invalid arguments, please specify both <chunkdb> (path to a local chunk database) and <file> (path to write the tar archive to, - for stdout)")
 	}
 
-	store, err := openDbStore(args[0])
+	store, err := openDbStore(args[0], ctx.GlobalBool("psql"))
 	if err != nil {
 		utils.Fatalf("error opening local chunk database: %s", err)
 	}
@@ -66,7 +66,7 @@ func dbImport(ctx *cli.Context) {
 		utils.Fatalf("invalid arguments, please specify both <chunkdb> (path to a local chunk database) and <file> (path to read the tar archive from, - for stdin)")
 	}
 
-	store, err := openDbStore(args[0])
+	store, err := openDbStore(args[0], ctx.GlobalBool("psql"))
 	if err != nil {
 		utils.Fatalf("error opening local chunk database: %s", err)
 	}
@@ -98,7 +98,7 @@ func dbClean(ctx *cli.Context) {
 		utils.Fatalf("invalid arguments, please specify <chunkdb> (path to a local chunk database)")
 	}
 
-	store, err := openDbStore(args[0])
+	store, err := openDbStore(args[0], ctx.GlobalBool("psql"))
 	if err != nil {
 		utils.Fatalf("error opening local chunk database: %s", err)
 	}
@@ -107,10 +107,10 @@ func dbClean(ctx *cli.Context) {
 	store.Cleanup()
 }
 
-func openDbStore(path string) (*storage.DbStore, error) {
+func openDbStore(path string, psql bool) (*storage.DbStore, error) {
 	if _, err := os.Stat(filepath.Join(path, "CURRENT")); err != nil {
 		return nil, fmt.Errorf("invalid chunkdb path: %s", err)
 	}
 	hash := storage.MakeHashFunc("SHA3")
-	return storage.NewDbStore(path, hash, 10000000, 0)
+	return storage.NewDbStore(path,  hash, 10000000, 0, psql)
 }

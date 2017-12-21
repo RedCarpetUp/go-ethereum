@@ -300,9 +300,14 @@ func copyDb(ctx *cli.Context) error {
 	dl := downloader.New(syncmode, chainDb, new(event.TypeMux), chain, nil, nil)
 
 	// Create a source peer to satisfy downloader requests from
-	//db, err := ethdb.NewLDBDatabase(ctx.Args().First(), ctx.GlobalInt(utils.CacheFlag.Name), 256)
+	var db ethdb.Database
+	var err error
+	if ctx.GlobalBool("psql") {
+		db, err = ethdb.NewPostgreSQLDb(ctx.Args().First())
+	}else {
+		db, err = ethdb.NewLDBDatabase(ctx.Args().First(), ctx.GlobalInt(utils.CacheFlag.Name), 256)
 
-	db,err := ethdb.NewPostgreSQLDb(ctx.Args().First())
+	}
 
 	if err != nil {
 		return err

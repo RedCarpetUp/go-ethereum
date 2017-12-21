@@ -58,6 +58,7 @@ type Swarm struct {
 	swapEnabled bool
 	lstore      *storage.LocalStore // local store, needs to store for releasing resources after node stopped
 	sfs         *fuse.SwarmFS       // need this to cleanup all the active mounts on node exit
+	psql        bool
 }
 
 type SwarmAPI struct {
@@ -76,7 +77,7 @@ func (self *Swarm) API() *SwarmAPI {
 
 // creates a new swarm service instance
 // implements node.Service
-func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, ensClient *ethclient.Client, config *api.Config, swapEnabled, syncEnabled bool, cors string) (self *Swarm, err error) {
+func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, ensClient *ethclient.Client, config *api.Config, swapEnabled, syncEnabled bool, cors string,  psql bool,) (self *Swarm, err error) {
 	if bytes.Equal(common.FromHex(config.PublicKey), storage.ZeroKey) {
 		return nil, fmt.Errorf("empty public key")
 	}
@@ -94,7 +95,7 @@ func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, ensClient *e
 	log.Debug(fmt.Sprintf("Setting up Swarm service components"))
 
 	hash := storage.MakeHashFunc(config.ChunkerParams.Hash)
-	self.lstore, err = storage.NewLocalStore(hash, config.StoreParams)
+	self.lstore, err = storage.NewLocalStore(hash, config.StoreParams, psql)
 	if err != nil {
 		return
 	}
@@ -152,6 +153,8 @@ func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, ensClient *e
 
 	self.sfs = fuse.NewSwarmFS(self.api)
 	log.Debug("-> Initializing Fuse file system")
+
+	self.psql = psql
 
 	return self, nil
 }
@@ -235,7 +238,7 @@ func (self *Swarm) Stop() error {
 
 // implements the node.Service interface
 func (self *Swarm) Protocols() []p2p.Protocol {
-	proto, err := network.Bzz(self.depo, self.backend, self.hive, self.dbAccess, self.config.Swap, self.config.SyncParams, self.config.NetworkId)
+	proto, err := network.Bzz(self.depo, self.backend, self.hive, self.dbAccess, self.config.Swap, self.config.SyncParams, self.config.NetworkId, self.psql)
 	if err != nil {
 		return nil
 	}

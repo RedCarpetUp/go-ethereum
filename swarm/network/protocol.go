@@ -43,7 +43,6 @@ import (
 	bzzswap "github.com/ethereum/go-ethereum/swarm/services/swap"
 	"github.com/ethereum/go-ethereum/swarm/services/swap/swap"
 	"github.com/ethereum/go-ethereum/swarm/storage"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const (
@@ -60,7 +59,7 @@ type bzz struct {
 	hive       *Hive                // the logistic manager, peerPool, routing service and peer handler
 	dbAccess   *DbAccess            // access to db storage counter and iterator for syncing
 	//requestDb  *storage.LDBDatabase // db to persist backlog of deliveries to aid syncing
-	requestDb  *ethdb.PgSQLDatabase // db to persist backlog of deliveries to aid syncing
+	requestDb  storage.Database // db to persist backlog of deliveries to aid syncing
 	remoteAddr *peerAddr            // remote peers address
 	peer       *p2p.Peer            // the p2p peer object
 	rw         p2p.MsgReadWriter    // messageReadWriter to send messages to
@@ -98,12 +97,19 @@ on each peer connection
 The Run function of the Bzz protocol class creates a bzz instance
 which will represent the peer for the swarm hive and all peer-aware components
 */
-func Bzz(cloud StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64) (p2p.Protocol, error) {
+func Bzz(cloud StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64, psql bool) (p2p.Protocol, error) {
 
 	// a single global request db is created for all peer connections
 	// this is to persist delivery backlog and aid syncronisation
 	//requestDb, err := storage.NewLDBDatabase(sy.RequestDbPath)
-	requestDb, err := ethdb.NewPostgreSQLDb(sy.RequestDbPath)
+	var requestDb storage.Database
+	var err error
+	if psql{
+		requestDb, err = storage.NewPostgreSQLDb(sy.RequestDbPath)
+	}else {
+		requestDb, err = storage.NewLDBDatabase(sy.RequestDbPath)
+	}
+
 	if err != nil {
 		return p2p.Protocol{}, fmt.Errorf("error setting up request db: %v", err)
 	}
@@ -133,7 +139,7 @@ the main protocol loop that
  * whenever handlers return an error the loop terminates
 */
 //func run(requestDb *storage.LDBDatabase, depo StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64, p *p2p.Peer, rw p2p.MsgReadWriter) (err error) {
-func run(requestDb *ethdb.PgSQLDatabase, depo StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64, p *p2p.Peer, rw p2p.MsgReadWriter) (err error) {
+func run(requestDb storage.Database, depo StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64, p *p2p.Peer, rw p2p.MsgReadWriter) (err error) {
 
 	self := &bzz{
 		storage:     depo,

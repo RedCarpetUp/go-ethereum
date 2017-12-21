@@ -517,6 +517,10 @@ var (
 		Usage: "Minimum POW accepted",
 		Value: whisper.DefaultMinimumPoW,
 	}
+	PsqlFlag = cli.BoolFlag{
+		Name:  "psql",
+		Usage: "Make PostgresSQL as default database instead of LevelDB",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -842,6 +846,7 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setHTTP(ctx, cfg)
 	setWS(ctx, cfg)
 	setNodeUserIdent(ctx, cfg)
+	setPSQL(ctx, cfg)
 
 	switch {
 	case ctx.GlobalIsSet(DataDirFlag.Name):
@@ -863,6 +868,10 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	if ctx.GlobalIsSet(NoUSBFlag.Name) {
 		cfg.NoUSB = ctx.GlobalBool(NoUSBFlag.Name)
 	}
+}
+
+func setPSQL(ctx *cli.Context, cfg *node.Config) {
+	cfg.PSQL = ctx.GlobalBool("psql")
 }
 
 func setGPO(ctx *cli.Context, cfg *gasprice.Config) {

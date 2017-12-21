@@ -646,8 +646,10 @@ func (n *Node) OpenDatabase(name string, cache, handles int) (ethdb.Database, er
 	if n.config.DataDir == "" {
 		return ethdb.NewMemDatabase()
 	}
-	return ethdb.NewPostgreSQLDb(n.config.resolvePath(name))
-	//return ethdb.NewLDBDatabase(n.config.resolvePath(name), cache, handles)
+	if n.config.PSQL{
+		return ethdb.NewPostgreSQLDb(n.config.resolvePath(name))
+	}
+	return ethdb.NewLDBDatabase(n.config.resolvePath(name), cache, handles)
 }
 
 // ResolvePath returns the absolute path of a resource in the instance directory.

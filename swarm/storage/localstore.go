@@ -28,8 +28,8 @@ type LocalStore struct {
 }
 
 // This constructor uses MemStore and DbStore as components
-func NewLocalStore(hash SwarmHasher, params *StoreParams) (*LocalStore, error) {
-	dbStore, err := NewDbStore(params.ChunkDbPath, hash, params.DbCapacity, params.Radius)
+func NewLocalStore(hash SwarmHasher, params *StoreParams, psql bool) (*LocalStore, error) {
+	dbStore, err := NewDbStore(params.ChunkDbPath, hash, params.DbCapacity, params.Radius, psql)
 	if err != nil {
 		return nil, err
 	}

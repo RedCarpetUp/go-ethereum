@@ -47,7 +47,7 @@ func NewLDBDatabase(file string) (*LDBDatabase, error) {
 	return database, nil
 }
 
-func (self *LDBDatabase) Put(key []byte, value []byte) {
+func (self *LDBDatabase) Put(key []byte, value []byte) error {
 	if self.comp {
 		value = rle.Compress(value)
 	}
@@ -56,6 +56,7 @@ func (self *LDBDatabase) Put(key []byte, value []byte) {
 	if err != nil {
 		fmt.Println("Error put", err)
 	}
+	return err
 }
 
 func (self *LDBDatabase) Get(key []byte) ([]byte, error) {
@@ -96,4 +97,32 @@ func (self *LDBDatabase) Write(batch *leveldb.Batch) error {
 func (self *LDBDatabase) Close() {
 	// Close the leveldb database
 	self.db.Close()
+}
+
+func (self *LDBDatabase) NewBatch () Batch{
+	return &ldbBatch{db: self.db, b: new(leveldb.Batch)}
+}
+
+type ldbBatch struct {
+	db   *leveldb.DB
+	b    *leveldb.Batch
+	size int
+}
+
+func (b *ldbBatch) Put(key, value []byte) {
+	b.b.Put(key, value)
+	b.size += len(value)
+}
+
+func (b *ldbBatch) Write() error {
+	return b.db.Write(b.b, nil)
+}
+
+func (b *ldbBatch) ValueSize() int {
+	return b.size
+}
+
+func (b *ldbBatch) Delete(key []byte) {
+	b.b.Delete(key)
+
 }

@@ -482,6 +482,7 @@ func detectEnsAddr(client *rpc.Client) (common.Address, error) {
 
 func registerBzzService(bzzconfig *bzzapi.Config, ctx *cli.Context, stack *node.Node) {
 
+	psql := ctx.GlobalBool("psql")
 	//define the swarm service boot function
 	boot := func(ctx *node.ServiceContext) (node.Service, error) {
 		var swapClient *ethclient.Client
@@ -514,7 +515,7 @@ func registerBzzService(bzzconfig *bzzapi.Config, ctx *cli.Context, stack *node.
 			}
 		}
 
-		return swarm.NewSwarm(ctx, swapClient, ensClient, bzzconfig, bzzconfig.SwapEnabled, bzzconfig.SyncEnabled, bzzconfig.Cors)
+		return swarm.NewSwarm(ctx, swapClient, ensClient, bzzconfig, bzzconfig.SwapEnabled, bzzconfig.SyncEnabled, bzzconfig.Cors, psql)
 	}
 	//register within the ethereum node
 	if err := stack.Register(boot); err != nil {

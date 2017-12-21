@@ -50,7 +50,13 @@ func upgradeDeduplicateData(db ethdb.Database) func() error {
 
 	go func() {
 		// Create an iterator to read the entire database and covert old lookup entires
-		it := db.(*ethdb.PgSQLDatabase).NewIterator()
+		it := db.(*ethdb.LDBDatabase).NewIterator()
+		//check type of db
+		_, ok := db.(*ethdb.PgSQLDatabase)
+		if ok{
+			it = db.(*ethdb.PgSQLDatabase).NewIterator()
+		}
+
 		defer func() {
 			if it != nil {
 				it.Release()
@@ -100,7 +106,12 @@ func upgradeDeduplicateData(db ethdb.Database) func() error {
 			converted++
 			if converted%100000 == 0 {
 				it.Release()
+				_, ok := db.(*ethdb.PgSQLDatabase)
 				it = db.(*ethdb.PgSQLDatabase).NewIterator()
+				if ok{
+					it = db.(*ethdb.LDBDatabase).NewIterator()
+				}
+				//it := db.(*ethdb.LDBDatabase).NewIterator()
 				it.Seek(key)
 
 				log.Info("Deduplicating database entries", "deduped", converted)

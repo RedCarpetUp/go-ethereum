@@ -22,9 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/storage"
-	//"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const counterKeyPrefix = 0x01
@@ -48,7 +46,7 @@ type syncDb struct {
 	priority       uint                 // priotity High|Medium|Low
 	buffer         chan interface{}     // incoming request channel
 	//db             *storage.LDBDatabase // underlying db (TODO should be interface)
-	db             *ethdb.PgSQLDatabase // underlying db (TODO should be interface)
+	db             storage.Database // underlying db (TODO should be interface)
 	done           chan bool            // chan to signal goroutines finished quitting
 	quit           chan bool            // chan to signal quitting to goroutines
 	total, dbTotal int                  // counts for one session
@@ -61,7 +59,7 @@ type syncDb struct {
 // uses a buffer and a leveldb for persistent storage
 // bufferSize, dbBatchSize are config parameters
 //func newSyncDb(db *storage.LDBDatabase, key storage.Key, priority uint, bufferSize, dbBatchSize uint, deliver func(interface{}, chan bool) bool) *syncDb {
-func newSyncDb(db *ethdb.PgSQLDatabase, key storage.Key, priority uint, bufferSize, dbBatchSize uint, deliver func(interface{}, chan bool) bool) *syncDb {
+func newSyncDb(db storage.Database, key storage.Key, priority uint, bufferSize, dbBatchSize uint, deliver func(interface{}, chan bool) bool) *syncDb {
 	start := make([]byte, 42)
 	start[1] = byte(priorities - priority)
 	copy(start[2:34], key)
@@ -117,7 +115,8 @@ func (self *syncDb) bufferRead(deliver func(interface{}, chan bool) bool) {
 	var req interface{}
 	var entry *syncDbEntry
 	var inBatch, inDb int
-	batch := self.db.NewBatchPgsql()
+	batch := self.db.NewBatch()
+	//batch := self.db.NewBatchPgsql()
 	//batch := new(leveldb.Batch)
 	var dbSize chan int
 	quit := self.quit
@@ -237,13 +236,13 @@ LOOP:
 }
 
 // writes the batch to the db and returns a new batch object
-func (self *syncDb) writeSyncBatch(batch *ethdb.PsqlBatch) *ethdb.PsqlBatch {
-	err := self.db.Write(batch)
+func (self *syncDb) writeSyncBatch(batch storage.Batch) storage.Batch{
+	err := batch.Write()
 	if err != nil {
 		log.Warn(fmt.Sprintf("syncDb[%v/%v] saving batch to db failed: %v", self.key.Log(), self.priority, err))
 		return batch
 	}
-	return self.db.NewBatchPgsql()
+	return self.db.NewBatch()
 	//return new(leveldb.Batch)
 }
 
@@ -286,7 +285,7 @@ func (self *syncDb) dbRead(useBatches bool, counter uint64, fun func(interface{}
 	var entry *syncDbEntry
 	var it iterator.Iterator
 	//var del *leveldb.Batch
-	var del *ethdb.PsqlBatch
+	var del storage.Batch
 	batchSizes := make(chan int)
 
 	for {
@@ -316,7 +315,7 @@ func (self *syncDb) dbRead(useBatches bool, counter uint64, fun func(interface{}
 			continue
 		}
 		//del = new(leveldb.Batch)
-		del = self.db.NewBatchPgsql()
+		del = self.db.NewBatch()
 		log.Trace(fmt.Sprintf("syncDb[%v/%v]: new iterator: %x (batch %v, count %v)", self.key.Log(), self.priority, key, batches, cnt))
 
 		for n = 0; !useBatches || n < cnt; it.Next() {
@@ -344,7 +343,8 @@ func (self *syncDb) dbRead(useBatches bool, counter uint64, fun func(interface{}
 			total++
 		}
 		log.Debug(fmt.Sprintf("syncDb[%v/%v] - db session closed, batches: %v, total: %v, session total from db: %v/%v", self.key.Log(), self.priority, batches, total, self.dbTotal, self.total))
-		self.db.Write(del) // this could be async called only when db is idle
+		//self.db.Write(del) // this could be async called only when db is idle
+		del.Write()
 		it.Release()
 	}
 }

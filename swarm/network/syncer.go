@@ -24,7 +24,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/storage"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 // syncer parameters (global, not peer specific) default values
@@ -180,7 +179,7 @@ type syncer struct {
 // by the forwarder
 func newSyncer(
 	//db *storage.LDBDatabase, remotekey storage.Key,
-	db *ethdb.PgSQLDatabase, remotekey storage.Key,
+	db storage.Database, remotekey storage.Key,
 	dbAccess *DbAccess,
 	unsyncedKeys func([]*syncRequest, *syncState) error,
 	store func(*storeRequestMsgData) error,
