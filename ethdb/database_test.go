@@ -339,6 +339,42 @@ func testPutGetPostgres(db ethdb.Database, t *testing.T) {
 	}
 }
 
+func TestPostgreSQLDb_PutGetBatch(t *testing.T) {
+	db,err := ethdb.NewPostgreSQLDb("test_table")
+	batch := db.NewBatch()
+	if err != nil {
+		t.Fatalf("New database create failed: "+ err.Error())
+	}
+	defer db.Close()
+	testPutGetPostgresBatch(batch,db, t)
+
+}
+
+
+
+func testPutGetPostgresBatch(b ethdb.Batch,db ethdb.Database, t *testing.T) {
+	t.Parallel()
+
+	for _, v := range test_values {
+		err := b.Put([]byte(v), []byte(v))
+		if err != nil {
+			t.Fatalf("put failed: %v", err)
+		}
+	}
+	b.Write()
+
+	for _, v := range test_values {
+		data, err := db.Get([]byte(v))
+		if err != nil {
+			t.Fatalf("get failed: %v", err)
+		}
+		if !bytes.Equal(data, []byte(v)) {
+			t.Fatalf("get returned wrong result, got %q expected %q", string(data), v)
+		}
+	}
+
+}
+
 func TestPostgre_ParallelPutGet(t *testing.T) {
 	db,err := ethdb.NewPostgreSQLDb("test_table")
 	if err != nil {

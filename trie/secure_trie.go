@@ -21,6 +21,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 var secureKeyPrefix = []byte("secure-key-")
@@ -175,9 +176,20 @@ func (t *SecureTrie) NodeIterator(start []byte) NodeIterator {
 // written back to the trie's attached database before using the trie.
 func (t *SecureTrie) CommitTo(db DatabaseWriter) (root common.Hash, err error) {
 	if len(t.getSecKeyCache()) > 0 {
-		for hk, key := range t.secKeyCache {
-			if err := db.Put(t.secKey([]byte(hk)), key); err != nil {
-				return common.Hash{}, err
+		_, ok := db.(*ethdb.PgSQLDatabase)
+		if ok{
+			batch := db.(*ethdb.PgSQLDatabase).NewBatch()
+			for hk, key := range t.secKeyCache {
+				if err := batch.Put(t.secKey([]byte(hk)), key); err != nil {
+					return common.Hash{}, err
+				}
+			}
+			batch.Write()
+		} else {
+			for hk, key := range t.secKeyCache {
+				if err := db.Put(t.secKey([]byte(hk)), key); err != nil {
+					return common.Hash{}, err
+				}
 			}
 		}
 		t.secKeyCache = make(map[string][]byte)

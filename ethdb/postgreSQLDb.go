@@ -15,6 +15,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"strconv"
 	"encoding/json"
+	"github.com/lib/pq"
 )
 
 const (
@@ -28,6 +29,8 @@ const (
 type PgSQLDatabase struct {
 	db *sql.DB
 	tableName string
+	stmtHas *sql.Stmt
+
 } 
 
 func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
@@ -46,9 +49,16 @@ func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
 		return nil, err
 	}
 
+
+	stmtHas, err := db.Prepare(`SELECT count(data->>$1) FROM `+tableName+` WHERE data ->> $1 is not null;`)
+	if err != nil{
+		log.Error(err.Error())
+	}
+
 	return &PgSQLDatabase{
 		db: db,
 		tableName:tableName,
+		stmtHas:stmtHas,
 	},nil
 }
 
@@ -150,11 +160,11 @@ WHERE data ->> $1 is not null;`
 
 func (db *PgSQLDatabase) Has (key []byte) (bool, error){
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := `SELECT count(data->>$1) FROM `+db.tableName+`
-WHERE data ->> $1 is not null;`
+	//sqlStatement := `SELECT count(data->>$1) FROM `+db.tableName+`WHERE data ->> $1 is not null;`
 	var numRows int
+	err := db.stmtHas.QueryRow(keyBase64).Scan(&numRows)
 	hasKey := false
-	err := db.db.QueryRow(sqlStatement, keyBase64).Scan(&numRows)
+	//err := db.db.QueryRow(sqlStatement, keyBase64).Scan(&numRows)
 	if numRows!=0{
 		hasKey = true
 	}
@@ -185,20 +195,15 @@ func (db *PgSQLDatabase) NewBatch() Batch {
 	if err != nil{
 		panic(err)
 	}
-	return &PsqlBatch{
-		db: db,
-		tx:tx,
-		}
-}
-
-func (db *PgSQLDatabase) NewBatchPgsql() *PsqlBatch {
-	tx, err := db.db.Begin()
+	stmtPut, err := tx.Prepare(pq.CopyIn(db.tableName, "data"))
+	//stmtPut, err := tx.Prepare(`INSERT INTO `+db.tableName+` VALUES ($1)`)
 	if err != nil{
-		panic(err)
+		log.Error(err.Error())
 	}
 	return &PsqlBatch{
 		db: db,
 		tx:tx,
+		stmtPut:stmtPut,
 		}
 }
 
@@ -206,34 +211,27 @@ func (db *PgSQLDatabase) NewBatchPgsql() *PsqlBatch {
 type PsqlBatch struct {
 	db   *PgSQLDatabase
 	tx   *sql.Tx
+	stmtPut *sql.Stmt
 	size int
 }
 
 func (b *PsqlBatch) Put(key []byte, value []byte) error  {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	valueBase64 := base64.StdEncoding.EncodeToString(value)
-	hasKey, err := b.db.Has(key)
-	if err!= nil {
-		return err
-	}
-	if hasKey {
-		sqlStatement := `UPDATE `+b.db.tableName+` SET data = $1
-where data ->> $2 is not null;`
-		_, err := b.tx.Exec(sqlStatement,
-			"{\""+keyBase64+"\":\""+valueBase64+"\"}", keyBase64)
-		b.size += len(value)
-		return err
-	}else {
-		sqlStatement := `INSERT INTO `+b.db.tableName+` VALUES ($1)`
-		_, err := b.tx.Exec(sqlStatement,
-			"{\""+keyBase64+"\":\""+valueBase64+"\"}")
-		b.size += len(value)
-		return err
-	}
+	//log.Info("batch put thing")
+
+	_, err := b.stmtPut.Exec("{\""+keyBase64+"\":\""+valueBase64+"\"}")
+	//sqlState	ment := `INSERT INTO `+b.db.tableName+` VALUES ($1)`
+	////_, err := b.tx.Exec(sqlStatement,
+	////	"{\""+keyBase64+"\":\""+valueBase64+"\"}")
+	b.size += len(value)
+	return err
+
 }
 
 func (b *PsqlBatch) Delete(key []byte) error{
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
+	//_, err := b.stmtDel.Exec(keyBase64)
 	sqlStatement := `DELETE FROM `+b.db.tableName+` WHERE data ->> $1 is not null;`
 	_, err := b.tx.Exec(sqlStatement,keyBase64)
 	b.size += 1
@@ -241,7 +239,18 @@ func (b *PsqlBatch) Delete(key []byte) error{
 }
 
 func (b *PsqlBatch) Write() error  {
-	err := b.tx.Commit()
+
+	//b.stmtPut.Close()
+	//b.stmtDel.Close()
+	_, err := b.stmtPut.Exec()
+	if err != nil {
+		log.Error(err.Error())
+	}
+	err = b.stmtPut.Close()
+	if err != nil {
+		log.Error(err.Error())
+	}
+	err = b.tx.Commit()
 	return err
 }
 

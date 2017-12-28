@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 type revision struct {
@@ -576,29 +577,60 @@ func (s *StateDB) CommitTo(dbw trie.DatabaseWriter, deleteEmptyObjects bool) (ro
 	defer s.clearJournalAndRefund()
 
 	// Commit objects to the trie.
-	for addr, stateObject := range s.stateObjects {
-		_, isDirty := s.stateObjectsDirty[addr]
-		switch {
-		case stateObject.suicided || (isDirty && deleteEmptyObjects && stateObject.empty()):
-			// If the object has been removed, don't bother syncing it
-			// and just mark it for deletion in the trie.
-			s.deleteStateObject(stateObject)
-		case isDirty:
-			// Write any contract code associated with the state object
-			if stateObject.code != nil && stateObject.dirtyCode {
-				if err := dbw.Put(stateObject.CodeHash(), stateObject.code); err != nil {
+
+	_, ok := dbw.(*ethdb.PgSQLDatabase)
+	if ok{
+		batch := dbw.(*ethdb.PgSQLDatabase).NewBatch()
+		for addr, stateObject := range s.stateObjects {
+			_, isDirty := s.stateObjectsDirty[addr]
+			switch {
+			case stateObject.suicided || (isDirty && deleteEmptyObjects && stateObject.empty()):
+				// If the object has been removed, don't bother syncing it
+				// and just mark it for deletion in the trie.
+				s.deleteStateObject(stateObject)
+			case isDirty:
+				// Write any contract code associated with the state object
+				if stateObject.code != nil && stateObject.dirtyCode {
+					if err := batch.Put(stateObject.CodeHash(), stateObject.code); err != nil {
+						return common.Hash{}, err
+					}
+					stateObject.dirtyCode = false
+				}
+				// Write any storage changes in the state object to its storage trie.
+				if err := stateObject.CommitTrie(s.db, dbw); err != nil {
 					return common.Hash{}, err
 				}
-				stateObject.dirtyCode = false
+				// Update the object in the main account trie.
+				s.updateStateObject(stateObject)
 			}
-			// Write any storage changes in the state object to its storage trie.
-			if err := stateObject.CommitTrie(s.db, dbw); err != nil {
-				return common.Hash{}, err
-			}
-			// Update the object in the main account trie.
-			s.updateStateObject(stateObject)
+			delete(s.stateObjectsDirty, addr)
 		}
-		delete(s.stateObjectsDirty, addr)
+		batch.Write()
+	}else {
+		for addr, stateObject := range s.stateObjects {
+			_, isDirty := s.stateObjectsDirty[addr]
+			switch {
+			case stateObject.suicided || (isDirty && deleteEmptyObjects && stateObject.empty()):
+				// If the object has been removed, don't bother syncing it
+				// and just mark it for deletion in the trie.
+				s.deleteStateObject(stateObject)
+			case isDirty:
+				// Write any contract code associated with the state object
+				if stateObject.code != nil && stateObject.dirtyCode {
+					if err := dbw.Put(stateObject.CodeHash(), stateObject.code); err != nil {
+						return common.Hash{}, err
+					}
+					stateObject.dirtyCode = false
+				}
+				// Write any storage changes in the state object to its storage trie.
+				if err := stateObject.CommitTrie(s.db, dbw); err != nil {
+					return common.Hash{}, err
+				}
+				// Update the object in the main account trie.
+				s.updateStateObject(stateObject)
+			}
+			delete(s.stateObjectsDirty, addr)
+		}
 	}
 	// Write trie changes.
 	root, err = s.trie.CommitTo(dbw)
