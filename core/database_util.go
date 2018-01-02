@@ -551,10 +551,15 @@ func WritePreimages(db ethdb.Database, number uint64, preimages map[common.Hash]
 	}
 	preimageCounter.Inc(int64(len(preimages)))
 	preimageHitCounter.Inc(int64(hitCount))
-	if hitCount > 0 {
-		if err := batch.Write(); err != nil {
-			return fmt.Errorf("preimage write fail for block %d: %v", number, err)
-		}
+	//if hitCount > 0 {
+	//	if err := batch.Write(); err != nil {
+	//		return fmt.Errorf("preimage write fail for block %d: %v", number, err)
+	//	}
+	//}
+
+	// write batch irrespective of hitcounter to close connection of Postgres
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("preimage write fail for block %d: %v", number, err)
 	}
 	return nil
 }

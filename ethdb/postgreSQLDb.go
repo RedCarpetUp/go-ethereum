@@ -50,7 +50,7 @@ func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
 	}
 
 
-	stmtHas, err := db.Prepare(`SELECT count(data->>$1) FROM `+tableName+` WHERE data ->> $1 is not null;`)
+	stmtHas, err := db.Prepare(`SELECT count(data->>$1) FROM `+tableName+` WHERE data ? $1;`)
 	if err != nil{
 		log.Error(err.Error())
 	}
@@ -130,7 +130,7 @@ func (db *PgSQLDatabase) Put (key []byte, value []byte) error {
 	}
 	if hasKey {
 		sqlStatement := `UPDATE `+db.tableName+` SET data = $1
-where data ->> $2 is not null;`
+where data ? $2;`
 		_, err := db.db.Exec(sqlStatement,
 			"{\""+keyBase64+"\":\""+valueBase64+"\"}", keyBase64)
 		return err
@@ -145,7 +145,7 @@ where data ->> $2 is not null;`
 func (db *PgSQLDatabase) Get (key []byte) ([]byte, error) {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	sqlStatement := `SELECT data->>$1 FROM `+db.tableName+`
-WHERE data ->> $1 is not null;`
+WHERE data ? $1 ;`
 	var data string
 	err := db.db.QueryRow(sqlStatement, keyBase64).Scan(&data)
 	if err != nil {
@@ -174,7 +174,7 @@ func (db *PgSQLDatabase) Has (key []byte) (bool, error){
 
 func (db *PgSQLDatabase) Delete(key []byte) error{
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := `DELETE FROM `+db.tableName+` WHERE data ->> $1 is not null;`
+	sqlStatement := `DELETE FROM `+db.tableName+` WHERE data ? $1;`
 	_, err := db.db.Exec(sqlStatement,keyBase64)
 	return err
 }
@@ -232,7 +232,7 @@ func (b *PsqlBatch) Put(key []byte, value []byte) error  {
 func (b *PsqlBatch) Delete(key []byte) error{
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	//_, err := b.stmtDel.Exec(keyBase64)
-	sqlStatement := `DELETE FROM `+b.db.tableName+` WHERE data ->> $1 is not null;`
+	sqlStatement := `DELETE FROM `+b.db.tableName+` WHERE data ? $1;`
 	_, err := b.tx.Exec(sqlStatement,keyBase64)
 	b.size += 1
 	return err
@@ -444,7 +444,7 @@ func (i *PgSQLIterator) Seek(key []byte) bool {
 	var jsonMap map[string]string
 
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := "SELECT data, index FROM (SELECT data, row_number() OVER(ORDER BY data ASC) AS INDEX FROM "+i.db.tableName+") As data WHERE data ->> '"+keyBase64+"' is not null;"
+	sqlStatement := "SELECT data, index FROM (SELECT data, row_number() OVER(ORDER BY data ASC) AS INDEX FROM "+i.db.tableName+") As data WHERE data ? '"+keyBase64+"';"
 	err := i.db.db.QueryRow(sqlStatement).Scan(&dataString,&indexString)
 
 	if err!=nil{
