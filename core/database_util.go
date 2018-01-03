@@ -463,6 +463,11 @@ func WriteBlockReceipts(db ethdb.Putter, hash common.Hash, number uint64, receip
 // a block, enabling hash based transaction and receipt lookups.
 func WriteTxLookupEntries(db ethdb.Putter, block *types.Block) error {
 	// Iterate over each transaction and encode its metadata
+	_,ok := db.(*ethdb.PgSQLDatabase)
+	var batch ethdb.Batch
+	if ok{
+		batch = db.(*ethdb.PgSQLDatabase).NewBatch()
+	}
 	for i, tx := range block.Transactions() {
 		entry := TxLookupEntry{
 			BlockHash:  block.Hash(),
@@ -473,9 +478,18 @@ func WriteTxLookupEntries(db ethdb.Putter, block *types.Block) error {
 		if err != nil {
 			return err
 		}
-		if err := db.Put(append(lookupPrefix, tx.Hash().Bytes()...), data); err != nil {
-			return err
+		if ok{
+			if err := batch.Put(append(lookupPrefix, tx.Hash().Bytes()...), data); err != nil {
+				return err
+			}
+		} else {
+			if err := db.Put(append(lookupPrefix, tx.Hash().Bytes()...), data); err != nil {
+				return err
+			}
 		}
+	}
+	if ok{
+		batch.Write()
 	}
 	return nil
 }
