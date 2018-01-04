@@ -15,8 +15,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"strconv"
 	"github.com/lib/pq"
-	"time"
-	//"runtime"
 )
 
 const (
@@ -38,7 +36,6 @@ type PgSQLDatabase struct {
 } 
 
 func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
-	now := time.Now()
 	//this removes '/', '-' from string
 	tableName = strings.Replace(tableName,"/","",-1)
 	tableName = strings.Replace(tableName,"-","",-1)
@@ -71,9 +68,6 @@ func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
 	if err != nil{
 		log.Error(err.Error())
 	}
-
-	elapsed := time.Since(now)
-	log.Info("time newdb = "+elapsed.String())
 
 	return &PgSQLDatabase{
 		db: db,
@@ -152,29 +146,22 @@ func EnsureTableExists(tableName string){
 }
 
 func (db *PgSQLDatabase) Put (key []byte, value []byte) error {
-	now := time.Now()
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	valueBase64 := base64.StdEncoding.EncodeToString(value)
-	fmt.Printf("-----")
 	hasKey, err := db.Has(key)
 	if err!= nil {
 		return err
 	}
 	if hasKey {
 		_, err := db.stmtUpdate.Exec(keyBase64,valueBase64)
-		elapsed := time.Since(now)
-		log.Info("time put = "+elapsed.String())
 		return err
 	} else {
 		_, err := db.stmtPut.Exec(keyBase64,valueBase64)
-		elapsed := time.Since(now)
-		log.Info("time put = "+elapsed.String())
 		return err
 	}
 }
 
 func (db *PgSQLDatabase) Get (key []byte) ([]byte, error) {
-	now := time.Now()
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	var data string
 
@@ -186,13 +173,10 @@ func (db *PgSQLDatabase) Get (key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	elapsed := time.Since(now)
-	log.Info("time get = "+elapsed.String())
 	return value, nil
 }
 
 func (db *PgSQLDatabase) Has (key []byte) (bool, error){
-	now := time.Now()
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	//sqlStatement := `SELECT count(data->>$1) FROM `+db.tableName+`WHERE data ->> $1 is not null;`
 	var numRows int
@@ -202,19 +186,14 @@ func (db *PgSQLDatabase) Has (key []byte) (bool, error){
 	if numRows!=0{
 		hasKey = true
 	}
-	elapsed := time.Since(now)
-	log.Info("time has = "+elapsed.String())
 	return hasKey, err
 
 }
 
 func (db *PgSQLDatabase) Delete(key []byte) error{
-	now := time.Now()
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	sqlStatement := `DELETE FROM `+db.tableName+` WHERE key = $1;`
 	_, err := db.db.Exec(sqlStatement,keyBase64)
-	elapsed := time.Since(now)
-	log.Info("time delete = "+elapsed.String())
 	return err
 }
 
@@ -230,7 +209,6 @@ func (self *PgSQLDatabase) Write(batch *PsqlBatch) error {
 }
 
 func (db *PgSQLDatabase) NewBatch() Batch {
-	now := time.Now()
 	tx, err := db.db.Begin()
 	if err != nil{
 		panic(err)
@@ -240,8 +218,6 @@ func (db *PgSQLDatabase) NewBatch() Batch {
 	if err != nil{
 		log.Error(err.Error())
 	}
-	elapsed := time.Since(now)
-	log.Info("time newbatch = "+elapsed.String())
 	return &PsqlBatch{
 		db: db,
 		tx:tx,
@@ -258,7 +234,6 @@ type PsqlBatch struct {
 }
 
 func (b *PsqlBatch) Put(key []byte, value []byte) error  {
-	now := time.Now()
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	valueBase64 := base64.StdEncoding.EncodeToString(value)
 	//log.Info("batch put thing")
@@ -268,26 +243,20 @@ func (b *PsqlBatch) Put(key []byte, value []byte) error  {
 	////_, err := b.tx.Exec(sqlStatement,
 	////	"{\""+keyBase64+"\":\""+valueBase64+"\"}")
 	b.size += len(value)
-	elapsed := time.Since(now)
-	log.Info("time batch put = "+elapsed.String())
 	return err
 
 }
 
 func (b *PsqlBatch) Delete(key []byte) error{
-	now := time.Now()
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	//_, err := b.stmtDel.Exec(keyBase64)
 	sqlStatement := `DELETE FROM `+b.db.tableName+` WHERE key = $1;`
 	_, err := b.tx.Exec(sqlStatement,keyBase64)
 	b.size += 1
-	elapsed := time.Since(now)
-	log.Info("time batch delete = "+elapsed.String())
 	return err
 }
 
 func (b *PsqlBatch) Write() error  {
-	now := time.Now()
 
 	//b.stmtPut.Close()
 	//b.stmtDel.Close()
@@ -300,8 +269,6 @@ func (b *PsqlBatch) Write() error  {
 		log.Error(err.Error())
 	}
 	err = b.tx.Commit()
-	elapsed := time.Since(now)
-	log.Info("time batch write = "+elapsed.String())
 	return err
 }
 
@@ -413,7 +380,6 @@ func (i *PgSQLIterator) Last() bool {
 }
 
 func (i *PgSQLIterator) Next() bool {
-	now := time.Now()
 	var key string
 	var value string
 
@@ -437,8 +403,6 @@ func (i *PgSQLIterator) Next() bool {
 	i.key = []byte(keyDecoded)
 	i.value = []byte(valueDecoded)
 	i.offset += 1
-	elapsed := time.Since(now)
-	log.Info("time iterator next = "+elapsed.String())
 	return true
 }
 
