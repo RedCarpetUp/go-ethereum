@@ -70,6 +70,25 @@ func BenchmarkInsertChain_ring1000_diskdb(b *testing.B) {
 	benchInsertChain(b, true, genTxRing(1000))
 }
 
+
+func BenchmarkInsertChain_empty_diskdb_psql(b *testing.B) {
+	benchInsertChainPsql(b, nil)
+}
+func BenchmarkInsertChain_valueTx_diskdb_psql(b *testing.B) {
+	benchInsertChainPsql(b, genValueTx(0))
+}
+func BenchmarkInsertChain_valueTx_100kB_diskdb_psql(b *testing.B) {
+	benchInsertChainPsql(b, genValueTx(100*1024))
+}
+func BenchmarkInsertChain_uncles_diskdb_psql(b *testing.B) {
+	benchInsertChainPsql(b, genUncles)
+}
+func BenchmarkInsertChain_ring200_diskdb_psql(b *testing.B) {
+	benchInsertChainPsql(b, genTxRing(200))
+}
+func BenchmarkInsertChain_ring1000_diskdb_psql(b *testing.B) {
+	benchInsertChainPsql(b, genTxRing(1000))
+}
 var (
 	// This is the content of the genesis block used by the benchmarks.
 	benchRootKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -182,6 +201,41 @@ func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 	}
 }
 
+func benchInsertChainPsql(b *testing.B, gen func(int, *BlockGen)) {
+	// Create the database in memory or in a temporary directory.
+	var db ethdb.Database
+	dir, err := ioutil.TempDir("", "eth-core-bench")
+	if err != nil {
+		b.Fatalf("cannot create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(dir)
+	db, err = ethdb.NewPostgreSQLDb(dir)
+	if err != nil {
+		b.Fatalf("cannot create temporary database: %v", err)
+	}
+	defer db.Close()
+
+	// Generate a chain of b.N blocks using the supplied block
+	// generator function.
+	gspec := Genesis{
+		Config: params.TestChainConfig,
+		Alloc:  GenesisAlloc{benchRootAddr: {Balance: benchRootFunds}},
+	}
+	genesis := gspec.MustCommit(db)
+	chain, _ := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, b.N, gen)
+
+	// Time the insertion of the new chain.
+	// State and blocks are stored in the same DB.
+	chainman, _ := NewBlockChain(db, gspec.Config, ethash.NewFaker(), vm.Config{})
+	defer chainman.Stop()
+	b.ReportAllocs()
+	b.ResetTimer()
+	if i, err := chainman.InsertChain(chain); err != nil {
+		b.Fatalf("insert error (block %d): %v\n", i, err)
+	}
+}
+
+
 func BenchmarkChainRead_header_10k(b *testing.B) {
 	benchReadChain(b, false, 10000)
 }
@@ -217,6 +271,44 @@ func BenchmarkChainWrite_header_500k(b *testing.B) {
 }
 func BenchmarkChainWrite_full_500k(b *testing.B) {
 	benchWriteChain(b, true, 500000)
+}
+
+
+func BenchmarkChainRead_header_10k_psql(b *testing.B) {
+	benchReadChainPsql(b, false, 10000)
+}
+func BenchmarkChainRead_full_10k_psql(b *testing.B) {
+	benchReadChainPsql(b, true, 10000)
+}
+func BenchmarkChainRead_header_100k_psql(b *testing.B) {
+	benchReadChainPsql(b, false, 100000)
+}
+func BenchmarkChainRead_full_100k_psql(b *testing.B) {
+	benchReadChainPsql(b, true, 100000)
+}
+func BenchmarkChainRead_header_500k_psql(b *testing.B) {
+	benchReadChainPsql(b, false, 500000)
+}
+func BenchmarkChainRead_full_500k_psql(b *testing.B) {
+	benchReadChainPsql(b, true, 500000)
+}
+func BenchmarkChainWrite_header_10k_psql(b *testing.B) {
+	benchWriteChainPsql(b, false, 10000)
+}
+func BenchmarkChainWrite_full_10k_psql(b *testing.B) {
+	benchWriteChainPsql(b, true, 10000)
+}
+func BenchmarkChainWrite_header_100k_psql(b *testing.B) {
+	benchWriteChainPsql(b, false, 100000)
+}
+func BenchmarkChainWrite_full_100k_psql(b *testing.B) {
+	benchWriteChainPsql(b, true, 100000)
+}
+func BenchmarkChainWrite_header_500k_psql(b *testing.B) {
+	benchWriteChainPsql(b, false, 500000)
+}
+func BenchmarkChainWrite_full_500k_psql(b *testing.B) {
+	benchWriteChainPsql(b, true, 500000)
 }
 
 // makeChainForBench writes a given number of headers or empty blocks/receipts
@@ -261,6 +353,22 @@ func benchWriteChain(b *testing.B, full bool, count uint64) {
 	}
 }
 
+func benchWriteChainPsql(b *testing.B, full bool, count uint64) {
+	for i := 0; i < b.N; i++ {
+		dir, err := ioutil.TempDir("", "eth-chain-bench")
+		if err != nil {
+			b.Fatalf("cannot create temporary directory: %v", err)
+		}
+		db, err := ethdb.NewPostgreSQLDb(dir)
+		if err != nil {
+			b.Fatalf("error opening database at %v: %v", dir, err)
+		}
+		makeChainForBench(db, full, count)
+		db.Close()
+		os.RemoveAll(dir)
+	}
+}
+
 func benchReadChain(b *testing.B, full bool, count uint64) {
 	dir, err := ioutil.TempDir("", "eth-chain-bench")
 	if err != nil {
@@ -280,6 +388,47 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 
 	for i := 0; i < b.N; i++ {
 		db, err := ethdb.NewLDBDatabase(dir, 128, 1024)
+		if err != nil {
+			b.Fatalf("error opening database at %v: %v", dir, err)
+		}
+		chain, err := NewBlockChain(db, params.TestChainConfig, ethash.NewFaker(), vm.Config{})
+		if err != nil {
+			b.Fatalf("error creating chain: %v", err)
+		}
+
+		for n := uint64(0); n < count; n++ {
+			header := chain.GetHeaderByNumber(n)
+			if full {
+				hash := header.Hash()
+				GetBody(db, hash, n)
+				GetBlockReceipts(db, hash, n)
+			}
+		}
+
+		chain.Stop()
+		db.Close()
+	}
+}
+
+func benchReadChainPsql(b *testing.B, full bool, count uint64) {
+	dir, err := ioutil.TempDir("", "eth-chain-bench")
+	if err != nil {
+		b.Fatalf("cannot create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	db, err := ethdb.NewPostgreSQLDb(dir)
+	if err != nil {
+		b.Fatalf("error opening database at %v: %v", dir, err)
+	}
+	makeChainForBench(db, full, count)
+	db.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		db, err := ethdb.NewPostgreSQLDb(dir)
 		if err != nil {
 			b.Fatalf("error opening database at %v: %v", dir, err)
 		}
