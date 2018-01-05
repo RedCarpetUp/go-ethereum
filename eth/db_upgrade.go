@@ -53,7 +53,7 @@ func upgradeDeduplicateData(db ethdb.Database) func() error {
 		it := db.(*ethdb.LDBDatabase).NewIterator()
 		//check type of db
 		_, ok := db.(*ethdb.PgSQLDatabase)
-		if ok{
+		if ok {
 			it = db.(*ethdb.PgSQLDatabase).NewIterator()
 		}
 
@@ -106,12 +106,12 @@ func upgradeDeduplicateData(db ethdb.Database) func() error {
 			converted++
 			if converted%100000 == 0 {
 				it.Release()
+				it = db.(*ethdb.LDBDatabase).NewIterator()
+				//if type of db -> PgSQLDatabase, it-> PgSQLDatabase.NewIterator()
 				_, ok := db.(*ethdb.PgSQLDatabase)
-				it = db.(*ethdb.PgSQLDatabase).NewIterator()
-				if ok{
-					it = db.(*ethdb.LDBDatabase).NewIterator()
+				if ok {
+					it = db.(*ethdb.PgSQLDatabase).NewIterator()
 				}
-				//it := db.(*ethdb.LDBDatabase).NewIterator()
 				it.Seek(key)
 
 				log.Info("Deduplicating database entries", "deduped", converted)

@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"runtime"
 )
 
 // calculator is a utility used by the hasher to calculate the hash value of the tree node.
@@ -73,7 +74,7 @@ func (h *hasher) returnCalculator(calculator *calculator) {
 // original node initialized with the computed hash to replace the original one.
 // outerMost bool used to check if the function is at outermost..
 // recursion (used for closing and writing batches in PostgreSQL)
-func (h *hasher) hash(n node, db DatabaseWriter, force bool, outerMost bool) (node, node, error) {
+func (h *hasher) hash(n node, db DatabaseWriter, force bool) (node, node, error) {
 
 	// If we're not storing the node, just hashing, use available cached data
 	if hash, dirty := n.cache(); hash != nil {
@@ -92,7 +93,7 @@ func (h *hasher) hash(n node, db DatabaseWriter, force bool, outerMost bool) (no
 	}
 
 	var batch ethdb.Batch
-	if outerMost{
+	if outerMost() {
 		//if db is Postgres, make a batch at outermost call to hash()
 		_, okPgDatabase := db.(*ethdb.PgSQLDatabase)
 		if okPgDatabase {
@@ -130,6 +131,13 @@ func (h *hasher) hash(n node, db DatabaseWriter, force bool, outerMost bool) (no
 	return hashed, cached, nil
 }
 
+//check if the function called is outermost or it is called from recursion
+func outerMost() bool {
+	pc := make([]uintptr, 2)
+	runtime.Callers(2, pc)                                      //skip: 1 - runtime.Caller, 2 - outer_most itself
+	return runtime.FuncForPC(pc[0]) != runtime.FuncForPC(pc[1]) // test if the caller of the caller is the same func, otherwise it is the outermost
+}
+
 // hashChildren replaces the children of a node with their hashes if the encoded
 // size of the child is larger than a hash, returning the collapsed node as well
 // as a replacement for the original node with the child hashes cached in.
@@ -144,7 +152,7 @@ func (h *hasher) hashChildren(original node, db DatabaseWriter) (node, node, err
 		cached.Key = common.CopyBytes(n.Key)
 
 		if _, ok := n.Val.(valueNode); !ok {
-			collapsed.Val, cached.Val, err = h.hash(n.Val, db, false, false)
+			collapsed.Val, cached.Val, err = h.hash(n.Val, db, false)
 			if err != nil {
 				return original, original, err
 			}
@@ -171,7 +179,7 @@ func (h *hasher) hashChildren(original node, db DatabaseWriter) (node, node, err
 			}
 			// Hash all other children properly
 			var herr error
-			collapsed.Children[index], cached.Children[index], herr = h.hash(n.Children[index], db, false, false)
+			collapsed.Children[index], cached.Children[index], herr = h.hash(n.Children[index], db, false)
 			if herr != nil {
 				h.mu.Lock() // rarely if ever locked, no congenstion
 				err = herr
@@ -240,7 +248,7 @@ func (h *hasher) store(n node, db DatabaseWriter, force bool) (node, error) {
 
 		var err error
 		_, ok := db.(*ethdb.PsqlBatch)
-		if ok{
+		if ok {
 			//if PgSQLDatabase, then add to transaction, commited in `batch.write()` in hash()
 			batch := db.(*ethdb.PsqlBatch)
 			err = batch.Put(hash, calculator.buffer.Bytes())

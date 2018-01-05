@@ -304,7 +304,7 @@ func copyDb(ctx *cli.Context) error {
 	var err error
 	if ctx.GlobalBool("psql") {
 		db, err = ethdb.NewPostgreSQLDb(ctx.Args().First())
-	}else {
+	} else {
 		db, err = ethdb.NewLDBDatabase(ctx.Args().First(), ctx.GlobalInt(utils.CacheFlag.Name), 256)
 
 	}

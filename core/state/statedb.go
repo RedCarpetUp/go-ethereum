@@ -574,9 +574,9 @@ func (s *StateDB) CommitTo(dbw trie.DatabaseWriter, deleteEmptyObjects bool) (ro
 	defer s.clearJournalAndRefund()
 
 	// Commit objects to the trie.
-
 	_, ok := dbw.(*ethdb.PgSQLDatabase)
-	if ok{
+	if ok {
+		//if dbw is PgSQLDatabase type, write in batches
 		batch := dbw.(*ethdb.PgSQLDatabase).NewBatch()
 		for addr, stateObject := range s.stateObjects {
 			_, isDirty := s.stateObjectsDirty[addr]
@@ -603,7 +603,7 @@ func (s *StateDB) CommitTo(dbw trie.DatabaseWriter, deleteEmptyObjects bool) (ro
 			delete(s.stateObjectsDirty, addr)
 		}
 		batch.Write()
-	}else {
+	} else {
 		for addr, stateObject := range s.stateObjects {
 			_, isDirty := s.stateObjectsDirty[addr]
 			switch {

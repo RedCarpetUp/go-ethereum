@@ -462,12 +462,12 @@ func WriteBlockReceipts(db ethdb.Putter, hash common.Hash, number uint64, receip
 // WriteTxLookupEntries stores a positional metadata for every transaction from
 // a block, enabling hash based transaction and receipt lookups.
 func WriteTxLookupEntries(db ethdb.Putter, block *types.Block) error {
-	// Iterate over each transaction and encode its metadata
-	_,ok := db.(*ethdb.PgSQLDatabase)
+	_, ok := db.(*ethdb.PgSQLDatabase)
 	var batch ethdb.Batch
-	if ok{
+	if ok {
 		batch = db.(*ethdb.PgSQLDatabase).NewBatch()
 	}
+	// Iterate over each transaction and encode its metadata
 	for i, tx := range block.Transactions() {
 		entry := TxLookupEntry{
 			BlockHash:  block.Hash(),
@@ -478,7 +478,7 @@ func WriteTxLookupEntries(db ethdb.Putter, block *types.Block) error {
 		if err != nil {
 			return err
 		}
-		if ok{
+		if ok {
 			if err := batch.Put(append(lookupPrefix, tx.Hash().Bytes()...), data); err != nil {
 				return err
 			}
@@ -488,7 +488,7 @@ func WriteTxLookupEntries(db ethdb.Putter, block *types.Block) error {
 			}
 		}
 	}
-	if ok{
+	if ok {
 		batch.Write()
 	}
 	return nil
@@ -565,15 +565,18 @@ func WritePreimages(db ethdb.Database, number uint64, preimages map[common.Hash]
 	}
 	preimageCounter.Inc(int64(len(preimages)))
 	preimageHitCounter.Inc(int64(hitCount))
-	//if hitCount > 0 {
-	//	if err := batch.Write(); err != nil {
-	//		return fmt.Errorf("preimage write fail for block %d: %v", number, err)
-	//	}
-	//}
 
-	// write batch irrespective of hitcounter to close connection of Postgres
-	if err := batch.Write(); err != nil {
-		return fmt.Errorf("preimage write fail for block %d: %v", number, err)
+	//check if batch is of type PsqlBatch
+	_, ok := batch.(*ethdb.PsqlBatch)
+	if ok {
+		// write batch irrespective of hitcounter to close connection of Postgres
+		if err := batch.Write(); err != nil {
+			return fmt.Errorf("preimage write fail for block %d: %v", number, err)
+		}
+	} else if hitCount > 0 {
+		if err := batch.Write(); err != nil {
+			return fmt.Errorf("preimage write fail for block %d: %v", number, err)
+		}
 	}
 	return nil
 }

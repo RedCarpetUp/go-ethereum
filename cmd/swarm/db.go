@@ -112,5 +112,5 @@ func openDbStore(path string, psql bool) (*storage.DbStore, error) {
 		return nil, fmt.Errorf("invalid chunkdb path: %s", err)
 	}
 	hash := storage.MakeHashFunc("SHA3")
-	return storage.NewDbStore(path,  hash, 10000000, 0, psql)
+	return storage.NewDbStore(path, hash, 10000000, 0, psql)
 }

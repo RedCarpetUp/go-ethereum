@@ -55,14 +55,13 @@ const (
 // bzz represents the swarm wire protocol
 // an instance is running on each peer
 type bzz struct {
-	storage    StorageHandler       // handler storage/retrieval related requests coming via the bzz wire protocol
-	hive       *Hive                // the logistic manager, peerPool, routing service and peer handler
-	dbAccess   *DbAccess            // access to db storage counter and iterator for syncing
-	//requestDb  *storage.LDBDatabase // db to persist backlog of deliveries to aid syncing
-	requestDb  storage.Database // db to persist backlog of deliveries to aid syncing
-	remoteAddr *peerAddr            // remote peers address
-	peer       *p2p.Peer            // the p2p peer object
-	rw         p2p.MsgReadWriter    // messageReadWriter to send messages to
+	storage    StorageHandler    // handler storage/retrieval related requests coming via the bzz wire protocol
+	hive       *Hive             // the logistic manager, peerPool, routing service and peer handler
+	dbAccess   *DbAccess         // access to db storage counter and iterator for syncing
+	requestDb  storage.Database  // db to persist backlog of deliveries to aid syncing
+	remoteAddr *peerAddr         // remote peers address
+	peer       *p2p.Peer         // the p2p peer object
+	rw         p2p.MsgReadWriter // messageReadWriter to send messages to
 	backend    chequebook.Backend
 	lastActive time.Time
 	NetworkId  uint64
@@ -101,12 +100,11 @@ func Bzz(cloud StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess 
 
 	// a single global request db is created for all peer connections
 	// this is to persist delivery backlog and aid syncronisation
-	//requestDb, err := storage.NewLDBDatabase(sy.RequestDbPath)
 	var requestDb storage.Database
 	var err error
-	if psql{
+	if psql {
 		requestDb, err = storage.NewPostgreSQLDb(sy.RequestDbPath)
-	}else {
+	} else {
 		requestDb, err = storage.NewLDBDatabase(sy.RequestDbPath)
 	}
 
@@ -138,7 +136,6 @@ the main protocol loop that
  * whenever the loop terminates, the peer will disconnect with Subprotocol error
  * whenever handlers return an error the loop terminates
 */
-//func run(requestDb *storage.LDBDatabase, depo StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64, p *p2p.Peer, rw p2p.MsgReadWriter) (err error) {
 func run(requestDb storage.Database, depo StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64, p *p2p.Peer, rw p2p.MsgReadWriter) (err error) {
 
 	self := &bzz{

@@ -178,7 +178,6 @@ type syncer struct {
 // the returned instance is attached to the peer and can be called
 // by the forwarder
 func newSyncer(
-	//db *storage.LDBDatabase, remotekey storage.Key,
 	db storage.Database, remotekey storage.Key,
 	dbAccess *DbAccess,
 	unsyncedKeys func([]*syncRequest, *syncState) error,

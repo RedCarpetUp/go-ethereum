@@ -65,7 +65,6 @@ type gcItem struct {
 
 type DbStore struct {
 	db Database
-	//db *LDBDatabase
 
 	// this should be stored in db, accessed transactionally
 	entryCnt, accessCnt, dataIdx, capacity uint64
@@ -78,15 +77,14 @@ type DbStore struct {
 	lock sync.Mutex
 }
 
-func NewDbStore(path string, hash SwarmHasher, capacity uint64, radius int,  psql bool) (s *DbStore, err error) {
+func NewDbStore(path string, hash SwarmHasher, capacity uint64, radius int, psql bool) (s *DbStore, err error) {
 	s = new(DbStore)
 
 	s.hashfunc = hash
 
-	//s.db, err = NewLDBDatabase(path)
-	if psql{
+	if psql {
 		s.db, err = NewPostgreSQLDb(path)
-	}else {
+	} else {
 		s.db, err = NewLDBDatabase(path)
 	}
 	if err != nil {
@@ -386,13 +384,11 @@ func (s *DbStore) Cleanup() {
 }
 
 func (s *DbStore) delete(idx uint64, idxKey []byte) {
-	//batch := new(leveldb.Batch)
 	batch := s.db.NewBatch()
 	batch.Delete(idxKey)
 	batch.Delete(getDataKey(idx))
 	s.entryCnt--
 	batch.Put(keyEntryCnt, U64ToBytes(s.entryCnt))
-	//s.db.Write(batch)
 	batch.Write()
 }
 
@@ -424,7 +420,6 @@ func (s *DbStore) Put(chunk *Chunk) {
 		s.collectGarbage(gcArrayFreeRatio)
 	}
 
-	//batch := new(leveldb.Batch)
 	batch := s.db.NewBatch()
 
 	batch.Put(getDataKey(s.dataIdx), data)
@@ -442,7 +437,6 @@ func (s *DbStore) Put(chunk *Chunk) {
 	batch.Put(keyAccessCnt, U64ToBytes(s.accessCnt))
 	s.accessCnt++
 
-	//s.db.Write(batch)
 	batch.Write()
 	if chunk.dbStored != nil {
 		close(chunk.dbStored)
@@ -458,7 +452,6 @@ func (s *DbStore) tryAccessIdx(ikey []byte, index *dpaDBIndex) bool {
 	}
 	decodeIndex(idata, index)
 
-	// batch := new(leveldb.Batch)
 	batch := s.db.NewBatch()
 
 	batch.Put(keyAccessCnt, U64ToBytes(s.accessCnt))
@@ -467,7 +460,6 @@ func (s *DbStore) tryAccessIdx(ikey []byte, index *dpaDBIndex) bool {
 	idata = encodeIndex(index)
 	batch.Put(ikey, idata)
 
-	//s.db.Write(batch)
 	batch.Write()
 
 	return true

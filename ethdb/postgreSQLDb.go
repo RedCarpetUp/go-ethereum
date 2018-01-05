@@ -3,7 +3,6 @@ package ethdb
 //TODO database not SQL injection secure
 
 import (
-
 	"fmt"
 
 	_ "github.com/lib/pq"
@@ -32,14 +31,13 @@ type PgSQLDatabase struct {
 	stmtGet    *sql.Stmt
 	stmtPut    *sql.Stmt
 	stmtUpdate *sql.Stmt
-
-} 
+}
 
 func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
 	//this removes '/', '-' from string
-	tableName = strings.Replace(tableName,"/","",-1)
-	tableName = strings.Replace(tableName,"-","",-1)
-	tableName = strings.Replace(tableName,".","",-1)
+	tableName = strings.Replace(tableName, "/", "", -1)
+	tableName = strings.Replace(tableName, "-", "", -1)
+	tableName = strings.Replace(tableName, ".", "", -1)
 	EnsureDatabaseExists()
 	EnsureTableExists(tableName)
 
@@ -51,49 +49,48 @@ func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
 		return nil, err
 	}
 
-
-	stmtHas, err := db.Prepare(`SELECT count(*) FROM `+tableName+` WHERE key = $1;`)
-	if err != nil{
+	stmtHas, err := db.Prepare(`SELECT count(*) FROM ` + tableName + ` WHERE key = $1;`)
+	if err != nil {
 		log.Error(err.Error())
 	}
-	stmtGet, err := db.Prepare(`SELECT value FROM `+tableName+` WHERE key = $1;`)
-	if err != nil{
+	stmtGet, err := db.Prepare(`SELECT value FROM ` + tableName + ` WHERE key = $1;`)
+	if err != nil {
 		log.Error(err.Error())
 	}
-	stmtPut, err := db.Prepare(`INSERT INTO `+tableName+` VALUES ($1, $2);`)
-	if err != nil{
+	stmtPut, err := db.Prepare(`INSERT INTO ` + tableName + ` VALUES ($1, $2);`)
+	if err != nil {
 		log.Error(err.Error())
 	}
-	stmtUpdate, err := db.Prepare(`UPDATE `+tableName+` SET value = $2 where key = $1;`)
-	if err != nil{
+	stmtUpdate, err := db.Prepare(`UPDATE ` + tableName + ` SET value = $2 where key = $1;`)
+	if err != nil {
 		log.Error(err.Error())
 	}
 
 	return &PgSQLDatabase{
-		db: db,
-		tableName:tableName,
-		stmtHas:stmtHas,
-		stmtGet: stmtGet,
-		stmtPut:stmtPut,
+		db:         db,
+		tableName:  tableName,
+		stmtHas:    stmtHas,
+		stmtGet:    stmtGet,
+		stmtPut:    stmtPut,
 		stmtUpdate: stmtUpdate,
-	},nil
+	}, nil
 }
 
 //check if database exists, if not create it
-func EnsureDatabaseExists(){
+func EnsureDatabaseExists() {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s sslmode=disable",
 		host, port, user, password)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		panic("could not get a connection:"+err.Error())
+		panic("could not get a connection:" + err.Error())
 	}
 
 	defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
-		panic("could not get a connection:"+err.Error())
+		panic("could not get a connection:" + err.Error())
 	}
 
 	//database exists if res.RowsAffected() returns 1, does not exists if returns 0
@@ -101,13 +98,13 @@ func EnsureDatabaseExists(){
 	if err != nil {
 		panic(err)
 	}
-	exists,err := res.RowsAffected()
+	exists, err := res.RowsAffected()
 	if err != nil {
 		panic(err)
 	}
-	if exists==0 {
+	if exists == 0 {
 		_, err := db.Exec("CREATE DATABASE psql_eth")
-		if err != nil{
+		if err != nil {
 			panic(err)
 		}
 		log.Info("created db")
@@ -116,52 +113,52 @@ func EnsureDatabaseExists(){
 }
 
 //check if table exists, if not create it
-func EnsureTableExists(tableName string){
+func EnsureTableExists(tableName string) {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		panic("Could not get a connection:"+err.Error())
+		panic("Could not get a connection:" + err.Error())
 	}
 
 	defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
-		panic("could not get a connection:"+err.Error())
+		panic("could not get a connection:" + err.Error())
 	}
 
 	//_, err = db.Exec(`CREATE TABLE IF NOT EXISTS `+tableName+`(data jsonb)`)
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS `+tableName+
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS ` + tableName +
 		`(key TEXT, value TEXT)`)
 	if err != nil {
-		panic("Create table failed :"+err.Error())
+		panic("Create table failed :" + err.Error())
 	}
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS `+tableName+`_index ON `+tableName+
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS ` + tableName + `_index ON ` + tableName +
 		`(key)`)
 	if err != nil {
-		panic("Create index failed :"+err.Error())
+		panic("Create index failed :" + err.Error())
 	}
 }
 
-func (db *PgSQLDatabase) Put (key []byte, value []byte) error {
+func (db *PgSQLDatabase) Put(key []byte, value []byte) error {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	valueBase64 := base64.StdEncoding.EncodeToString(value)
 	hasKey, err := db.Has(key)
-	if err!= nil {
+	if err != nil {
 		return err
 	}
 	if hasKey {
-		_, err := db.stmtUpdate.Exec(keyBase64,valueBase64)
+		_, err := db.stmtUpdate.Exec(keyBase64, valueBase64)
 		return err
 	} else {
-		_, err := db.stmtPut.Exec(keyBase64,valueBase64)
+		_, err := db.stmtPut.Exec(keyBase64, valueBase64)
 		return err
 	}
 }
 
-func (db *PgSQLDatabase) Get (key []byte) ([]byte, error) {
+func (db *PgSQLDatabase) Get(key []byte) ([]byte, error) {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	var data string
 
@@ -176,30 +173,30 @@ func (db *PgSQLDatabase) Get (key []byte) ([]byte, error) {
 	return value, nil
 }
 
-func (db *PgSQLDatabase) Has (key []byte) (bool, error){
+func (db *PgSQLDatabase) Has(key []byte) (bool, error) {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	//sqlStatement := `SELECT count(data->>$1) FROM `+db.tableName+`WHERE data ->> $1 is not null;`
 	var numRows int
 	err := db.stmtHas.QueryRow(keyBase64).Scan(&numRows)
 	hasKey := false
 	//err := db.db.QueryRow(sqlStatement, keyBase64).Scan(&numRows)
-	if numRows!=0{
+	if numRows != 0 {
 		hasKey = true
 	}
 	return hasKey, err
 
 }
 
-func (db *PgSQLDatabase) Delete(key []byte) error{
+func (db *PgSQLDatabase) Delete(key []byte) error {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := `DELETE FROM `+db.tableName+` WHERE key = $1;`
-	_, err := db.db.Exec(sqlStatement,keyBase64)
+	sqlStatement := `DELETE FROM ` + db.tableName + ` WHERE key = $1;`
+	_, err := db.db.Exec(sqlStatement, keyBase64)
 	return err
 }
 
 func (db *PgSQLDatabase) Close() {
 	err := db.db.Close()
-	if err != nil{
+	if err != nil {
 		panic(err)
 	}
 }
@@ -210,35 +207,34 @@ func (self *PgSQLDatabase) Write(batch *PsqlBatch) error {
 
 func (db *PgSQLDatabase) NewBatch() Batch {
 	tx, err := db.db.Begin()
-	if err != nil{
+	if err != nil {
 		panic(err)
 	}
 	stmtPut, err := tx.Prepare(pq.CopyIn(db.tableName, "key", "value"))
 	//stmtPut, err := tx.Prepare(`INSERT INTO `+db.tableName+` VALUES ($1)`)
-	if err != nil{
+	if err != nil {
 		log.Error(err.Error())
 	}
 	return &PsqlBatch{
-		db: db,
-		tx:tx,
-		stmtPut:stmtPut,
-		}
+		db:      db,
+		tx:      tx,
+		stmtPut: stmtPut,
+	}
 }
-
 
 type PsqlBatch struct {
-	db   *PgSQLDatabase
-	tx   *sql.Tx
+	db      *PgSQLDatabase
+	tx      *sql.Tx
 	stmtPut *sql.Stmt
-	size int
+	size    int
 }
 
-func (b *PsqlBatch) Put(key []byte, value []byte) error  {
+func (b *PsqlBatch) Put(key []byte, value []byte) error {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	valueBase64 := base64.StdEncoding.EncodeToString(value)
 	//log.Info("batch put thing")
 
-	_, err := b.stmtPut.Exec(keyBase64,valueBase64)
+	_, err := b.stmtPut.Exec(keyBase64, valueBase64)
 	//sqlState	ment := `INSERT INTO `+b.db.tableName+` VALUES ($1)`
 	////_, err := b.tx.Exec(sqlStatement,
 	////	"{\""+keyBase64+"\":\""+valueBase64+"\"}")
@@ -247,16 +243,16 @@ func (b *PsqlBatch) Put(key []byte, value []byte) error  {
 
 }
 
-func (b *PsqlBatch) Delete(key []byte) error{
+func (b *PsqlBatch) Delete(key []byte) error {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	//_, err := b.stmtDel.Exec(keyBase64)
-	sqlStatement := `DELETE FROM `+b.db.tableName+` WHERE key = $1;`
-	_, err := b.tx.Exec(sqlStatement,keyBase64)
+	sqlStatement := `DELETE FROM ` + b.db.tableName + ` WHERE key = $1;`
+	_, err := b.tx.Exec(sqlStatement, keyBase64)
 	b.size += 1
 	return err
 }
 
-func (b *PsqlBatch) Write() error  {
+func (b *PsqlBatch) Write() error {
 
 	//b.stmtPut.Close()
 	//b.stmtDel.Close()
@@ -272,26 +268,26 @@ func (b *PsqlBatch) Write() error  {
 	return err
 }
 
-func (b *PsqlBatch) ValueSize() int  {
+func (b *PsqlBatch) ValueSize() int {
 	return b.size
 }
 
 func (db *PgSQLDatabase) NewIterator() iterator.Iterator {
 	return &PgSQLIterator{
-		offset:0,
+		offset: 0,
 		key:    make([]byte, 0),
 		value:  make([]byte, 0),
-		db: db,
+		db:     db,
 	}
 }
 
 type PgSQLIterator struct {
 	offset int
-	db *PgSQLDatabase
+	db     *PgSQLDatabase
 	//CommonIterator
-	key         []byte
-	value       []byte
-	err         error
+	key   []byte
+	value []byte
+	err   error
 }
 
 //type CommonIterator struct {
@@ -306,24 +302,24 @@ func (i *PgSQLIterator) First() bool {
 	var value string
 	sqlStatement := "SELECT * FROM " + i.db.tableName + " ORDER BY key ASC LIMIT 1 OFFSET 0"
 	err := i.db.db.QueryRow(sqlStatement).Scan(&key, &value)
-	if err != nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
 
 	keyDecoded, err := base64.StdEncoding.DecodeString(key)
-	if err!= nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
 	valueDecoded, err := base64.StdEncoding.DecodeString(value)
-	if err!= nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
 	i.key = []byte(keyDecoded)
 	i.value = []byte(valueDecoded)
-	i.offset=0
+	i.offset = 0
 	return true
 }
 
@@ -333,8 +329,8 @@ func (i *PgSQLIterator) Last() bool {
 
 	sqlStatementLast := "SELECT count(*) FROM " + i.db.tableName
 	err := i.db.db.QueryRow(sqlStatementLast).Scan(&totalString)
-	if err != nil{
-		if err == sql.ErrNoRows{
+	if err != nil {
+		if err == sql.ErrNoRows {
 			return false
 		}
 		i.err = err
@@ -342,7 +338,7 @@ func (i *PgSQLIterator) Last() bool {
 	}
 
 	totalInt, err = strconv.Atoi(totalString)
-	if err != nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
@@ -352,27 +348,26 @@ func (i *PgSQLIterator) Last() bool {
 
 	sqlStatement2 := "SELECT * FROM " + i.db.tableName + " ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(totalInt-1)
 	err = i.db.db.QueryRow(sqlStatement2).Scan(&key, &value)
-	if err != nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
 
-
 	keyDecoded, err := base64.StdEncoding.DecodeString(key)
-	if err!= nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
 	valueDecoded, err := base64.StdEncoding.DecodeString(value)
-	if err!= nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
 	i.key = []byte(keyDecoded)
 	i.value = []byte(valueDecoded)
 
-	i.offset,err = strconv.Atoi(strconv.Itoa(totalInt-1))
-	if err != nil{
+	i.offset, err = strconv.Atoi(strconv.Itoa(totalInt - 1))
+	if err != nil {
 		i.err = err
 		return false
 	}
@@ -385,18 +380,18 @@ func (i *PgSQLIterator) Next() bool {
 
 	sqlStatement := "SELECT * FROM " + i.db.tableName + " ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset+1)
 	err := i.db.db.QueryRow(sqlStatement).Scan(&key, &value)
-	if err != nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
 
 	keyDecoded, err := base64.StdEncoding.DecodeString(key)
-	if err!= nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
 	valueDecoded, err := base64.StdEncoding.DecodeString(value)
-	if err!= nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
@@ -412,18 +407,18 @@ func (i *PgSQLIterator) Prev() bool {
 
 	sqlStatement := "SELECT * FROM " + i.db.tableName + " ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset-1)
 	err := i.db.db.QueryRow(sqlStatement).Scan(&key, &value)
-	if err != nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
 
 	keyDecoded, err := base64.StdEncoding.DecodeString(key)
-	if err!= nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
 	valueDecoded, err := base64.StdEncoding.DecodeString(value)
-	if err!= nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
@@ -439,11 +434,11 @@ func (i *PgSQLIterator) Seek(key []byte) bool {
 	var indexString string
 
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := "SELECT value, index FROM (SELECT key, value, row_number() OVER(ORDER BY key ASC) AS INDEX FROM "+i.db.tableName+") As data WHERE key = '"+keyBase64+"';"
-	err := i.db.db.QueryRow(sqlStatement).Scan(&value,&indexString)
+	sqlStatement := "SELECT value, index FROM (SELECT key, value, row_number() OVER(ORDER BY key ASC) AS INDEX FROM " + i.db.tableName + ") As data WHERE key = '" + keyBase64 + "';"
+	err := i.db.db.QueryRow(sqlStatement).Scan(&value, &indexString)
 
-	if err!=nil{
-		if err.Error() == "sql: no rows in result set"{
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
 			return false
 		}
 		i.err = err
@@ -451,15 +446,15 @@ func (i *PgSQLIterator) Seek(key []byte) bool {
 	}
 
 	valueDecoded, err := base64.StdEncoding.DecodeString(value)
-	if err!= nil{
+	if err != nil {
 		i.err = err
 		return false
 	}
 	i.key = key
 	i.value = []byte(valueDecoded)
 	indexInt, err := strconv.Atoi(indexString)
-	i.offset = indexInt-1
-	if err!= nil{
+	i.offset = indexInt - 1
+	if err != nil {
 		i.err = err
 		return false
 	}
@@ -483,9 +478,8 @@ func (i *PgSQLIterator) SetReleaser(releaser util.Releaser) {
 	//doesn't do anything
 }
 
-
 func (i *PgSQLIterator) Valid() bool {
-	if i.err != nil{
+	if i.err != nil {
 		return false
 	}
 	return true

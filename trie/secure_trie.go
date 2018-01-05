@@ -177,7 +177,7 @@ func (t *SecureTrie) NodeIterator(start []byte) NodeIterator {
 func (t *SecureTrie) CommitTo(db DatabaseWriter) (root common.Hash, err error) {
 	if len(t.getSecKeyCache()) > 0 {
 		_, ok := db.(*ethdb.PgSQLDatabase)
-		if ok{
+		if ok {
 			batch := db.(*ethdb.PgSQLDatabase).NewBatch()
 			for hk, key := range t.secKeyCache {
 				if err := batch.Put(t.secKey([]byte(hk)), key); err != nil {

@@ -99,7 +99,7 @@ func (self *LDBDatabase) Close() {
 	self.db.Close()
 }
 
-func (self *LDBDatabase) NewBatch () Batch{
+func (self *LDBDatabase) NewBatch() Batch {
 	return &ldbBatch{db: self.db, b: new(leveldb.Batch)}
 }
 

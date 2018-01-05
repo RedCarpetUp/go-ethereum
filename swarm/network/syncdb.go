@@ -40,25 +40,23 @@ it switches back to in-memory buffer.
 when syncdb is stopped all items in the buffer are saved to the db
 */
 type syncDb struct {
-	start          []byte               // this syncdb starting index in requestdb
-	key            storage.Key          // remote peers address key
-	counterKey     []byte               // db key to persist counter
-	priority       uint                 // priotity High|Medium|Low
-	buffer         chan interface{}     // incoming request channel
-	//db             *storage.LDBDatabase // underlying db (TODO should be interface)
-	db             storage.Database // underlying db (TODO should be interface)
-	done           chan bool            // chan to signal goroutines finished quitting
-	quit           chan bool            // chan to signal quitting to goroutines
-	total, dbTotal int                  // counts for one session
-	batch          chan chan int        // channel for batch requests
-	dbBatchSize    uint                 // number of items before batch is saved
+	start          []byte           // this syncdb starting index in requestdb
+	key            storage.Key      // remote peers address key
+	counterKey     []byte           // db key to persist counter
+	priority       uint             // priotity High|Medium|Low
+	buffer         chan interface{} // incoming request channel
+	db             storage.Database // underlying db
+	done           chan bool        // chan to signal goroutines finished quitting
+	quit           chan bool        // chan to signal quitting to goroutines
+	total, dbTotal int              // counts for one session
+	batch          chan chan int    // channel for batch requests
+	dbBatchSize    uint             // number of items before batch is saved
 }
 
 // constructor needs a shared request db (leveldb)
 // priority is used in the index key
 // uses a buffer and a leveldb for persistent storage
 // bufferSize, dbBatchSize are config parameters
-//func newSyncDb(db *storage.LDBDatabase, key storage.Key, priority uint, bufferSize, dbBatchSize uint, deliver func(interface{}, chan bool) bool) *syncDb {
 func newSyncDb(db storage.Database, key storage.Key, priority uint, bufferSize, dbBatchSize uint, deliver func(interface{}, chan bool) bool) *syncDb {
 	start := make([]byte, 42)
 	start[1] = byte(priorities - priority)
@@ -116,8 +114,6 @@ func (self *syncDb) bufferRead(deliver func(interface{}, chan bool) bool) {
 	var entry *syncDbEntry
 	var inBatch, inDb int
 	batch := self.db.NewBatch()
-	//batch := self.db.NewBatchPgsql()
-	//batch := new(leveldb.Batch)
 	var dbSize chan int
 	quit := self.quit
 	counterValue := make([]byte, 8)
@@ -236,14 +232,13 @@ LOOP:
 }
 
 // writes the batch to the db and returns a new batch object
-func (self *syncDb) writeSyncBatch(batch storage.Batch) storage.Batch{
+func (self *syncDb) writeSyncBatch(batch storage.Batch) storage.Batch {
 	err := batch.Write()
 	if err != nil {
 		log.Warn(fmt.Sprintf("syncDb[%v/%v] saving batch to db failed: %v", self.key.Log(), self.priority, err))
 		return batch
 	}
 	return self.db.NewBatch()
-	//return new(leveldb.Batch)
 }
 
 // abstract type for db entries (TODO could be a feature of Receipts)
@@ -284,7 +279,6 @@ func (self *syncDb) dbRead(useBatches bool, counter uint64, fun func(interface{}
 	var more bool
 	var entry *syncDbEntry
 	var it iterator.Iterator
-	//var del *leveldb.Batch
 	var del storage.Batch
 	batchSizes := make(chan int)
 
@@ -314,7 +308,6 @@ func (self *syncDb) dbRead(useBatches bool, counter uint64, fun func(interface{}
 			useBatches = true
 			continue
 		}
-		//del = new(leveldb.Batch)
 		del = self.db.NewBatch()
 		log.Trace(fmt.Sprintf("syncDb[%v/%v]: new iterator: %x (batch %v, count %v)", self.key.Log(), self.priority, key, batches, cnt))
 
@@ -343,8 +336,7 @@ func (self *syncDb) dbRead(useBatches bool, counter uint64, fun func(interface{}
 			total++
 		}
 		log.Debug(fmt.Sprintf("syncDb[%v/%v] - db session closed, batches: %v, total: %v, session total from db: %v/%v", self.key.Log(), self.priority, batches, total, self.dbTotal, self.total))
-		//self.db.Write(del) // this could be async called only when db is idle
-		del.Write()
+		del.Write() // this could be async called only when db is idle
 		it.Release()
 	}
 }

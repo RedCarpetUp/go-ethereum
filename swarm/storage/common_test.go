@@ -80,7 +80,7 @@ func testStore(m ChunkStore, l int64, branches int64, t *testing.T) {
 	})
 	swg := &sync.WaitGroup{}
 	key, err := chunker.Split(rand.Reader, l, chunkC, swg, nil)
-	if err != nil{
+	if err != nil {
 		t.Fatalf("chunker.split error: ", err)
 	}
 	swg.Wait()

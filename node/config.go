@@ -140,7 +140,7 @@ type Config struct {
 	Logger log.Logger
 
 	PSQL bool
-	//set to use PostgreSQL as default
+	//set this flag to use PostgreSQL as default database instead of LevelDb
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into

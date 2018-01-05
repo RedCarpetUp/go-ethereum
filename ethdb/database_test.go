@@ -45,7 +45,7 @@ func newTestLDB() (*ethdb.LDBDatabase, func()) {
 	}
 }
 
-var test_values = []string{ "","a", "1251", "\x00123\x00"}
+var test_values = []string{"", "a", "1251", "\x00123\x00"}
 
 func TestLDB_PutGet(t *testing.T) {
 	db, remove := newTestLDB()
@@ -192,7 +192,6 @@ func testParallelPutGet(db ethdb.Database, t *testing.T) {
 	pending.Wait()
 }
 
-
 func TestNewPostgreSQLDb(t *testing.T) {
 	//attempt to drop "psql_eth", ignore error if "psql_eth" doesn't exist
 	dropDb("psql_eth")
@@ -204,7 +203,6 @@ func TestNewPostgreSQLDb(t *testing.T) {
 
 	ethdb.EnsureTableExists("test_table")
 
-
 }
 
 const (
@@ -215,24 +213,23 @@ const (
 	dbname   = "psql_eth"
 )
 
-
 func dropDb(dbName string) {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s sslmode=disable",
 		host, port, user, password)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		panic("could not get a connection:"+err.Error())
+		panic("could not get a connection:" + err.Error())
 	}
 
 	defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
-		panic("could not get a connection:"+err.Error())
+		panic("could not get a connection:" + err.Error())
 	}
 
-	db.Exec("DROP DATABASE "+dbName)
+	db.Exec("DROP DATABASE " + dbName)
 
 }
 
@@ -242,30 +239,30 @@ func dropTable() {
 		host, port, user, password, dbname)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		panic("could not get a connection:"+err.Error())
+		panic("could not get a connection:" + err.Error())
 	}
 
 	defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
-		panic("could not get a connection:"+err.Error())
+		panic("could not get a connection:" + err.Error())
 	}
 
 	_, err = db.Exec("CREATE TABLE IF NOT EXISTS test_table(data jsonb);")
 	if err != nil {
-		panic("Create Table failed :"+err.Error())
+		panic("Create Table failed :" + err.Error())
 	}
 	_, err = db.Exec("DROP TABLE test_table")
 	if err != nil {
-		panic("Drop Table failed :"+err.Error())
+		panic("Drop Table failed :" + err.Error())
 	}
 }
 
 func TestPostgreSQLDb_PutGet(t *testing.T) {
-	db,err := ethdb.NewPostgreSQLDb("test_table")
+	db, err := ethdb.NewPostgreSQLDb("test_table")
 	if err != nil {
-		t.Fatalf("New database create failed: "+ err.Error())
+		t.Fatalf("New database create failed: " + err.Error())
 	}
 	defer db.Close()
 	testPutGetPostgres(db, t)
@@ -340,19 +337,17 @@ func testPutGetPostgres(db ethdb.Database, t *testing.T) {
 }
 
 func TestPostgreSQLDb_PutGetBatch(t *testing.T) {
-	db,err := ethdb.NewPostgreSQLDb("test_table")
+	db, err := ethdb.NewPostgreSQLDb("test_table")
 	batch := db.NewBatch()
 	if err != nil {
-		t.Fatalf("New database create failed: "+ err.Error())
+		t.Fatalf("New database create failed: " + err.Error())
 	}
 	defer db.Close()
-	testPutGetPostgresBatch(batch,db, t)
+	testPutGetPostgresBatch(batch, db, t)
 
 }
 
-
-
-func testPutGetPostgresBatch(b ethdb.Batch,db ethdb.Database, t *testing.T) {
+func testPutGetPostgresBatch(b ethdb.Batch, db ethdb.Database, t *testing.T) {
 	t.Parallel()
 
 	for _, v := range test_values {
@@ -376,26 +371,26 @@ func testPutGetPostgresBatch(b ethdb.Batch,db ethdb.Database, t *testing.T) {
 }
 
 func TestPostgre_ParallelPutGet(t *testing.T) {
-	db,err := ethdb.NewPostgreSQLDb("test_table")
+	db, err := ethdb.NewPostgreSQLDb("test_table")
 	if err != nil {
-		t.Fatalf("New database create failed: "+ err.Error())
+		t.Fatalf("New database create failed: " + err.Error())
 	}
 	defer db.Close()
 	testParallelPutGet(db, t)
 }
 
 func TestPgSQLIterator(t *testing.T) {
-	db,err := ethdb.NewPostgreSQLDb("test_table")
+	db, err := ethdb.NewPostgreSQLDb("test_table")
 	if err != nil {
-		t.Fatalf("New database create failed: "+ err.Error())
+		t.Fatalf("New database create failed: " + err.Error())
 	}
 	defer db.Close()
-	testPostgresIterator(db,t)
+	testPostgresIterator(db, t)
 }
 
 //temporary test cases
 //TODO rewrite them
-func testPostgresIterator(db *ethdb.PgSQLDatabase, t *testing.T)  {
+func testPostgresIterator(db *ethdb.PgSQLDatabase, t *testing.T) {
 	for _, v := range test_values {
 		err := db.Put([]byte(v), []byte(v))
 		if err != nil {
@@ -405,47 +400,47 @@ func testPostgresIterator(db *ethdb.PgSQLDatabase, t *testing.T)  {
 
 	it := db.NewIterator()
 	it.First()
-	if !(bytes.Equal(it.Key(), []byte(""))){
+	if !(bytes.Equal(it.Key(), []byte(""))) {
 		t.Fatalf(string(it.Key()))
 	}
 	it.Next()
-	if !(bytes.Equal(it.Key(), []byte("\x00123\x00"))){
+	if !(bytes.Equal(it.Key(), []byte("\x00123\x00"))) {
 		t.Fatalf("next failed")
 	}
 	it.Next()
-	if !(bytes.Equal(it.Key(), []byte("1251"))){
+	if !(bytes.Equal(it.Key(), []byte("1251"))) {
 		t.Fatalf("next failed")
 	}
 
 	it.Last()
-	if !(bytes.Equal(it.Key(), []byte("a"))){
+	if !(bytes.Equal(it.Key(), []byte("a"))) {
 		t.Fatalf("last failed")
 	}
 
 	it.Prev()
-	if !(bytes.Equal(it.Key(), []byte("1251"))){
+	if !(bytes.Equal(it.Key(), []byte("1251"))) {
 		t.Fatalf("prev failed")
 	}
 	it.Prev()
-	if !(bytes.Equal(it.Key(), []byte("\x00123\x00"))){
+	if !(bytes.Equal(it.Key(), []byte("\x00123\x00"))) {
 		t.Fatalf("prev failed")
 	}
 
 	it.Seek([]byte("1251"))
-	if !(bytes.Equal(it.Value(), []byte("1251"))){
+	if !(bytes.Equal(it.Value(), []byte("1251"))) {
 		t.Fatalf("seek failed")
 	}
 	it.Next()
-	if !(bytes.Equal(it.Key(), []byte("a"))){
+	if !(bytes.Equal(it.Key(), []byte("a"))) {
 		t.Fatalf("next failed")
 	}
 	it.Next()
-	if !(bytes.Equal(it.Key(), []byte("a"))){
+	if !(bytes.Equal(it.Key(), []byte("a"))) {
 		t.Fatalf("next failed")
 	}
 
 	it.Prev()
-	if !(bytes.Equal(it.Key(), []byte("1251"))){
+	if !(bytes.Equal(it.Key(), []byte("1251"))) {
 		t.Fatalf("prev failed")
 	}
 }
