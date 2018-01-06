@@ -365,7 +365,7 @@ type randTestStep struct {
 }
 
 const (
-	opUpdate = iota
+	opUpdate              = iota
 	opDelete
 	opGet
 	opCommit
@@ -373,7 +373,7 @@ const (
 	opReset
 	opItercheckhash
 	opCheckCacheInvariant
-	opMax // boundary value, not an actual op
+	opMax                  // boundary value, not an actual op
 )
 
 func (randTest) Generate(r *rand.Rand, size int) reflect.Value {
@@ -509,6 +509,9 @@ func BenchmarkGetDB(b *testing.B)    { benchGet(b, true) }
 func BenchmarkUpdateBE(b *testing.B) { benchUpdate(b, binary.BigEndian) }
 func BenchmarkUpdateLE(b *testing.B) { benchUpdate(b, binary.LittleEndian) }
 
+func BenchmarkGetPsql(b *testing.B)   { benchGetPsql(b, false) }
+func BenchmarkGetDBPsql(b *testing.B) { benchGetPsql(b, true) }
+
 const benchElemCount = 20000
 
 func benchGet(b *testing.B, commit bool) {
@@ -532,11 +535,38 @@ func benchGet(b *testing.B, commit bool) {
 		trie.Get(k)
 	}
 	b.StopTimer()
-
 	if commit {
 		ldb := trie.db.(*ethdb.LDBDatabase)
 		ldb.Close()
 		os.RemoveAll(ldb.Path())
+	}
+}
+
+func benchGetPsql(b *testing.B, commit bool) {
+	trie := new(Trie)
+	if commit {
+		_, tmpdb := tempDBPsql()
+		trie, _ = New(common.Hash{}, tmpdb)
+	}
+	k := make([]byte, 32)
+	for i := 0; i < benchElemCount; i++ {
+		binary.LittleEndian.PutUint64(k, uint64(i))
+		trie.Update(k, k)
+	}
+	binary.LittleEndian.PutUint64(k, benchElemCount/2)
+	if commit {
+		trie.Commit()
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		trie.Get(k)
+	}
+	b.StopTimer()
+
+	if commit {
+		psql := trie.db.(*ethdb.PgSQLDatabase)
+		psql.Close()
 	}
 }
 
@@ -591,6 +621,18 @@ func tempDB() (string, Database) {
 		panic(fmt.Sprintf("can't create temporary directory: %v", err))
 	}
 	db, err := ethdb.NewLDBDatabase(dir, 256, 0)
+	if err != nil {
+		panic(fmt.Sprintf("can't create temporary database: %v", err))
+	}
+	return dir, db
+}
+
+func tempDBPsql() (string, Database) {
+	dir, err := ioutil.TempDir("", "trie-bench")
+	if err != nil {
+		panic(fmt.Sprintf("can't create temporary directory: %v", err))
+	}
+	db, err := ethdb.NewPostgreSQLDb(dir)
 	if err != nil {
 		panic(fmt.Sprintf("can't create temporary database: %v", err))
 	}

@@ -71,6 +71,32 @@ func newTestSyncDb(priority, bufferSize, batchSize int, dbdir string, t *testing
 
 }
 
+func newTestSyncDbPsql(priority, bufferSize, batchSize int, dbdir string, t *testing.T) *testSyncDb {
+	if len(dbdir) == 0 {
+		tmp, err := ioutil.TempDir(os.TempDir(), "syncdb-test")
+		if err != nil {
+			t.Fatalf("unable to create temporary direcory %v: %v", tmp, err)
+		}
+		dbdir = tmp
+	}
+	db, err := storage.NewPostgreSQLDb(filepath.Join(dbdir, "requestdb"))
+	if err != nil {
+		t.Fatalf("unable to create db: %v", err)
+	}
+	self := &testSyncDb{
+		fromDb: make(chan bool),
+		dbdir:  dbdir,
+		t:      t,
+	}
+	h := crypto.Keccak256Hash([]byte{0})
+	key := storage.Key(h[:])
+	self.syncDb = newSyncDb(db, key, uint(priority), uint(bufferSize), uint(batchSize), self.deliver)
+	// kick off db iterator right away, if no items on db this will allow
+	// reading from the buffer
+	return self
+
+}
+
 func (self *testSyncDb) close() {
 	self.db.Close()
 	os.RemoveAll(self.dbdir)
@@ -179,6 +205,46 @@ func TestSyncDb(t *testing.T) {
 	s.expect(1, false)
 }
 
+func TestSyncDbPsql(t *testing.T) {
+	t.Skip("fails randomly on all platforms")
+
+	priority := High
+	bufferSize := 5
+	batchSize := 2 * bufferSize
+	s := newTestSyncDbPsql(priority, bufferSize, batchSize, "", t)
+	defer s.close()
+	defer s.stop()
+	s.dbRead(false, 0, s.deliver)
+	s.draindb()
+
+	s.push(4)
+	s.expect(1, false)
+	// 3 in buffer
+	time.Sleep(100 * time.Millisecond)
+	s.push(3)
+	// push over limit
+	s.expect(1, false)
+	// one popped from the buffer, then contention detected
+	s.expect(4, true)
+	s.push(4)
+	s.expect(5, true)
+	// depleted db, switch back to buffer
+	s.draindb()
+	s.push(5)
+	s.expect(4, false)
+	s.push(3)
+	s.expect(4, false)
+	// buffer depleted
+	time.Sleep(100 * time.Millisecond)
+	s.push(6)
+	s.expect(1, false)
+	// push into buffer full, switch to db
+	s.expect(5, true)
+	s.draindb()
+	s.push(1)
+	s.expect(1, false)
+}
+
 func TestSaveSyncDb(t *testing.T) {
 	amount := 30
 	priority := High
@@ -212,6 +278,48 @@ func TestSaveSyncDb(t *testing.T) {
 	s.db.Close()
 
 	s = newTestSyncDb(priority, bufferSize, batchSize, s.dbdir, t)
+	defer s.close()
+	defer s.stop()
+
+	go s.dbRead(false, 0, s.deliver)
+	s.push(1)
+	s.expect(1, false)
+
+}
+
+func TestSaveSyncDbPsql(t *testing.T) {
+	amount := 30
+	priority := High
+	bufferSize := amount
+	batchSize := 10
+	s := newTestSyncDbPsql(priority, bufferSize, batchSize, "", t)
+	go s.dbRead(false, 0, s.deliver)
+	s.push(amount)
+	s.stop()
+	s.db.Close()
+
+	s = newTestSyncDbPsql(priority, bufferSize, batchSize, s.dbdir, t)
+	go s.dbRead(false, 0, s.deliver)
+	s.expect(amount, true)
+	for i, key := range s.delivered {
+		expKey := crypto.Keccak256([]byte{byte(i)})
+		if !bytes.Equal(key, expKey) {
+			t.Fatalf("delivery %v expected to be key %x, got %x", i, expKey, key)
+		}
+	}
+	s.push(amount)
+	s.expect(amount, false)
+	for i := amount; i < 2*amount; i++ {
+		key := s.delivered[i]
+		expKey := crypto.Keccak256([]byte{byte(i - amount)})
+		if !bytes.Equal(key, expKey) {
+			t.Fatalf("delivery %v expected to be key %x, got %x", i, expKey, key)
+		}
+	}
+	s.stop()
+	s.db.Close()
+
+	s = newTestSyncDbPsql(priority, bufferSize, batchSize, s.dbdir, t)
 	defer s.close()
 	defer s.stop()
 
