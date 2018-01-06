@@ -521,6 +521,10 @@ var (
 		Name:  "psql",
 		Usage: "Make PostgresSQL as default database instead of LevelDB",
 	}
+	PsqlTableName = cli.StringFlag{
+		Name: "psqlTableName",
+		Usage: "Table Name to be used in PostgreSQL",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -847,6 +851,7 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setWS(ctx, cfg)
 	setNodeUserIdent(ctx, cfg)
 	setPSQL(ctx, cfg)
+	setPsqlTableName(ctx, cfg)
 
 	switch {
 	case ctx.GlobalIsSet(DataDirFlag.Name):
@@ -872,6 +877,10 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 
 func setPSQL(ctx *cli.Context, cfg *node.Config) {
 	cfg.PSQL = ctx.GlobalBool("psql")
+}
+
+func setPsqlTableName(ctx *cli.Context, cfg *node.Config)  {
+	cfg.PsqlTableName = ctx.GlobalString("psqlTableName")
 }
 
 func setGPO(ctx *cli.Context, cfg *gasprice.Config) {

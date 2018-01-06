@@ -96,14 +96,14 @@ on each peer connection
 The Run function of the Bzz protocol class creates a bzz instance
 which will represent the peer for the swarm hive and all peer-aware components
 */
-func Bzz(cloud StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64, psql bool) (p2p.Protocol, error) {
+func Bzz(cloud StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess *DbAccess, sp *bzzswap.SwapParams, sy *SyncParams, networkId uint64, psql bool, psqlTableName string) (p2p.Protocol, error) {
 
 	// a single global request db is created for all peer connections
 	// this is to persist delivery backlog and aid syncronisation
 	var requestDb storage.Database
 	var err error
 	if psql {
-		requestDb, err = storage.NewPostgreSQLDb(sy.RequestDbPath)
+		requestDb, err = storage.NewPostgreSQLDb(psqlTableName)
 	} else {
 		requestDb, err = storage.NewLDBDatabase(sy.RequestDbPath)
 	}

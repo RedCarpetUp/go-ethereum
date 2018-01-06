@@ -120,6 +120,7 @@ var (
 		utils.ExtraDataFlag,
 		configFileFlag,
 		utils.PsqlFlag,
+		utils.PsqlTableName,
 	}
 
 	rpcFlags = []cli.Flag{

@@ -566,8 +566,8 @@ func WritePreimages(db ethdb.Database, number uint64, preimages map[common.Hash]
 	preimageCounter.Inc(int64(len(preimages)))
 	preimageHitCounter.Inc(int64(hitCount))
 
-	//check if batch is of type PsqlBatch
-	_, ok := batch.(*ethdb.PsqlBatch)
+	//check if db is of type PsqlDatabase
+	_, ok := db.(*ethdb.PgSQLDatabase)
 	if ok {
 		// write batch irrespective of hitcounter to close connection of Postgres
 		if err := batch.Write(); err != nil {

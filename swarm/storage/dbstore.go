@@ -77,13 +77,13 @@ type DbStore struct {
 	lock sync.Mutex
 }
 
-func NewDbStore(path string, hash SwarmHasher, capacity uint64, radius int, psql bool) (s *DbStore, err error) {
+func NewDbStore(path string, hash SwarmHasher, capacity uint64, radius int, psql bool, psqlTableName string) (s *DbStore, err error) {
 	s = new(DbStore)
 
 	s.hashfunc = hash
 
 	if psql {
-		s.db, err = NewPostgreSQLDb(path)
+		s.db, err = NewPostgreSQLDb(psqlTableName)
 	} else {
 		s.db, err = NewLDBDatabase(path)
 	}

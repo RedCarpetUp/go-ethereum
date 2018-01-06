@@ -67,7 +67,7 @@ func NewLocalDPA(datadir string) (*DPA, error) {
 
 	hash := MakeHashFunc("SHA256")
 
-	dbStore, err := NewDbStore(datadir, hash, singletonSwarmDbCapacity, 0, false)
+	dbStore, err := NewDbStore(datadir, hash, singletonSwarmDbCapacity, 0, false, "")
 	if err != nil {
 		return nil, err
 	}

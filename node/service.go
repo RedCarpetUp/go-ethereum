@@ -47,7 +47,7 @@ func (ctx *ServiceContext) OpenDatabase(name string, cache int, handles int) (et
 	var db ethdb.Database
 	var err error
 	if ctx.config.PSQL {
-		db, err = ethdb.NewPostgreSQLDb(ctx.config.resolvePath(name))
+		db, err = ethdb.NewPostgreSQLDb(ctx.config.PsqlTableName)
 	} else {
 		db, err = ethdb.NewLDBDatabase(ctx.config.resolvePath(name), cache, handles)
 

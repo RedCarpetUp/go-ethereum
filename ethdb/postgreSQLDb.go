@@ -38,6 +38,9 @@ func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
 	tableName = strings.Replace(tableName, "/", "", -1)
 	tableName = strings.Replace(tableName, "-", "", -1)
 	tableName = strings.Replace(tableName, ".", "", -1)
+	if tableName == "" {
+		tableName = "ethereumDefault"
+	}
 	EnsureDatabaseExists()
 	EnsureTableExists(tableName)
 

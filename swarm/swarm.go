@@ -43,22 +43,23 @@ import (
 
 // the swarm stack
 type Swarm struct {
-	config      *api.Config            // swarm configuration
-	api         *api.Api               // high level api layer (fs/manifest)
-	dns         api.Resolver           // DNS registrar
-	dbAccess    *network.DbAccess      // access to local chunk db iterator and storage counter
-	storage     storage.ChunkStore     // internal access to storage, common interface to cloud storage backends
-	dpa         *storage.DPA           // distributed preimage archive, the local API to the storage with document level storage/retrieval support
-	depo        network.StorageHandler // remote request handler, interface between bzz protocol and the storage
-	cloud       storage.CloudStore     // procurement, cloud storage backend (can multi-cloud)
-	hive        *network.Hive          // the logistic manager
-	backend     chequebook.Backend     // simple blockchain Backend
-	privateKey  *ecdsa.PrivateKey
-	corsString  string
-	swapEnabled bool
-	lstore      *storage.LocalStore // local store, needs to store for releasing resources after node stopped
-	sfs         *fuse.SwarmFS       // need this to cleanup all the active mounts on node exit
-	psql        bool
+	config      	*api.Config            // swarm configuration
+	api         	*api.Api               // high level api layer (fs/manifest)
+	dns         	api.Resolver           // DNS registrar
+	dbAccess    	*network.DbAccess      // access to local chunk db iterator and storage counter
+	storage     	storage.ChunkStore     // internal access to storage, common interface to cloud storage backends
+	dpa         	*storage.DPA           // distributed preimage archive, the local API to the storage with document level storage/retrieval support
+	depo        	network.StorageHandler // remote request handler, interface between bzz protocol and the storage
+	cloud       	storage.CloudStore     // procurement, cloud storage backend (can multi-cloud)
+	hive        	*network.Hive          // the logistic manager
+	backend     	chequebook.Backend     // simple blockchain Backend
+	privateKey  	*ecdsa.PrivateKey
+	corsString  	string
+	swapEnabled 	bool
+	lstore      	*storage.LocalStore // local store, needs to store for releasing resources after node stopped
+	sfs         	*fuse.SwarmFS       // need this to cleanup all the active mounts on node exit
+	psql        	bool
+	psqlTableName 	string
 }
 
 type SwarmAPI struct {
@@ -77,7 +78,7 @@ func (self *Swarm) API() *SwarmAPI {
 
 // creates a new swarm service instance
 // implements node.Service
-func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, ensClient *ethclient.Client, config *api.Config, swapEnabled, syncEnabled bool, cors string, psql bool, ) (self *Swarm, err error) {
+func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, ensClient *ethclient.Client, config *api.Config, swapEnabled, syncEnabled bool, cors string, psql bool, psqlTableName string) (self *Swarm, err error) {
 	if bytes.Equal(common.FromHex(config.PublicKey), storage.ZeroKey) {
 		return nil, fmt.Errorf("empty public key")
 	}
@@ -95,7 +96,7 @@ func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, ensClient *e
 	log.Debug(fmt.Sprintf("Setting up Swarm service components"))
 
 	hash := storage.MakeHashFunc(config.ChunkerParams.Hash)
-	self.lstore, err = storage.NewLocalStore(hash, config.StoreParams, psql)
+	self.lstore, err = storage.NewLocalStore(hash, config.StoreParams, psql, psqlTableName)
 	if err != nil {
 		return
 	}
@@ -155,6 +156,7 @@ func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, ensClient *e
 	log.Debug("-> Initializing Fuse file system")
 
 	self.psql = psql
+	self.psqlTableName = psqlTableName
 
 	return self, nil
 }
@@ -238,7 +240,7 @@ func (self *Swarm) Stop() error {
 
 // implements the node.Service interface
 func (self *Swarm) Protocols() []p2p.Protocol {
-	proto, err := network.Bzz(self.depo, self.backend, self.hive, self.dbAccess, self.config.Swap, self.config.SyncParams, self.config.NetworkId, self.psql)
+	proto, err := network.Bzz(self.depo, self.backend, self.hive, self.dbAccess, self.config.Swap, self.config.SyncParams, self.config.NetworkId, self.psql, self.psqlTableName)
 	if err != nil {
 		return nil
 	}
