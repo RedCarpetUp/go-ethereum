@@ -522,7 +522,7 @@ var (
 		Usage: "Make PostgresSQL as default database instead of LevelDB",
 	}
 	PsqlTableName = cli.StringFlag{
-		Name: "psqlTableName",
+		Name:  "psqlTableName",
 		Usage: "Table Name to be used in PostgreSQL",
 	}
 )
@@ -879,7 +879,7 @@ func setPSQL(ctx *cli.Context, cfg *node.Config) {
 	cfg.PSQL = ctx.GlobalBool("psql")
 }
 
-func setPsqlTableName(ctx *cli.Context, cfg *node.Config)  {
+func setPsqlTableName(ctx *cli.Context, cfg *node.Config) {
 	cfg.PsqlTableName = ctx.GlobalString("psqlTableName")
 }
 

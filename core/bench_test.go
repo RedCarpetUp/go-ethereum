@@ -70,7 +70,6 @@ func BenchmarkInsertChain_ring1000_diskdb(b *testing.B) {
 	benchInsertChain(b, true, genTxRing(1000))
 }
 
-
 func BenchmarkInsertChain_empty_diskdb_psql(b *testing.B) {
 	benchInsertChainPsql(b, nil)
 }
@@ -89,6 +88,7 @@ func BenchmarkInsertChain_ring200_diskdb_psql(b *testing.B) {
 func BenchmarkInsertChain_ring1000_diskdb_psql(b *testing.B) {
 	benchInsertChainPsql(b, genTxRing(1000))
 }
+
 var (
 	// This is the content of the genesis block used by the benchmarks.
 	benchRootKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -235,7 +235,6 @@ func benchInsertChainPsql(b *testing.B, gen func(int, *BlockGen)) {
 	}
 }
 
-
 func BenchmarkChainRead_header_10k(b *testing.B) {
 	benchReadChain(b, false, 10000)
 }
@@ -272,7 +271,6 @@ func BenchmarkChainWrite_header_500k(b *testing.B) {
 func BenchmarkChainWrite_full_500k(b *testing.B) {
 	benchWriteChain(b, true, 500000)
 }
-
 
 func BenchmarkChainRead_header_10k_psql(b *testing.B) {
 	benchReadChainPsql(b, false, 10000)

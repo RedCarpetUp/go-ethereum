@@ -107,7 +107,7 @@ func upgradeDeduplicateData(db ethdb.Database) func() error {
 			if converted%100000 == 0 {
 				it.Release()
 				it = db.(*ethdb.LDBDatabase).NewIterator()
-				//if type of db -> PgSQLDatabase, it-> PgSQLDatabase.NewIterator()
+				//if type of db is PgSQLDatabase, make PgSQLDatabase.NewIterator()
 				_, ok := db.(*ethdb.PgSQLDatabase)
 				if ok {
 					it = db.(*ethdb.PgSQLDatabase).NewIterator()

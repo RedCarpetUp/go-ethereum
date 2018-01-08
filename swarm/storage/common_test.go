@@ -79,10 +79,7 @@ func testStore(m ChunkStore, l int64, branches int64, t *testing.T) {
 		Hash:     SHA3Hash,
 	})
 	swg := &sync.WaitGroup{}
-	key, err := chunker.Split(rand.Reader, l, chunkC, swg, nil)
-	if err != nil {
-		t.Fatalf("chunker.split error: ", err)
-	}
+	key, _ := chunker.Split(rand.Reader, l, chunkC, swg, nil)
 	swg.Wait()
 	close(chunkC)
 	chunkC = make(chan *Chunk)

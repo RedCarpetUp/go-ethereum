@@ -24,9 +24,9 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"database/sql"
 
 	"github.com/ethereum/go-ethereum/ethdb"
-	"database/sql"
 )
 
 func newTestLDB() (*ethdb.LDBDatabase, func()) {

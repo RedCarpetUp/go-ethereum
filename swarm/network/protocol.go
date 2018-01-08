@@ -102,6 +102,7 @@ func Bzz(cloud StorageHandler, backend chequebook.Backend, hive *Hive, dbaccess 
 	// this is to persist delivery backlog and aid syncronisation
 	var requestDb storage.Database
 	var err error
+	//if psql flag is on, make Postgres type db, else Lvldb
 	if psql {
 		requestDb, err = storage.NewPostgreSQLDb(psqlTableName)
 	} else {

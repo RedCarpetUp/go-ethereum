@@ -302,11 +302,11 @@ func copyDb(ctx *cli.Context) error {
 	// Create a source peer to satisfy downloader requests from
 	var db ethdb.Database
 	var err error
+	//if psql flag is on, make database of PostgreSQLDb type, else LvlDb type
 	if ctx.GlobalBool("psql") {
 		db, err = ethdb.NewPostgreSQLDb(ctx.GlobalString("psqlTableName"))
 	} else {
 		db, err = ethdb.NewLDBDatabase(ctx.Args().First(), ctx.GlobalInt(utils.CacheFlag.Name), 256)
-
 	}
 
 	if err != nil {

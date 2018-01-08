@@ -19,4 +19,4 @@ WORKDIR /go-ethereum
 
 RUN go version
 RUN make geth
-RUN ./build/bin/geth --testnet -psql
+RUN ./build/bin/geth --testnet -psql --psqlTableName "testnetgethchaindata"

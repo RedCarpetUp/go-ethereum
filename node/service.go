@@ -46,6 +46,7 @@ func (ctx *ServiceContext) OpenDatabase(name string, cache int, handles int) (et
 
 	var db ethdb.Database
 	var err error
+	//if psql flag is on, make Postgres type database else Lvldb
 	if ctx.config.PSQL {
 		db, err = ethdb.NewPostgreSQLDb(ctx.config.PsqlTableName)
 	} else {

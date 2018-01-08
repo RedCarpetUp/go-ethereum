@@ -462,6 +462,7 @@ func WriteBlockReceipts(db ethdb.Putter, hash common.Hash, number uint64, receip
 // WriteTxLookupEntries stores a positional metadata for every transaction from
 // a block, enabling hash based transaction and receipt lookups.
 func WriteTxLookupEntries(db ethdb.Putter, block *types.Block) error {
+	//if database is of type PgSQLDatabase, Put data in batches
 	_, ok := db.(*ethdb.PgSQLDatabase)
 	var batch ethdb.Batch
 	if ok {

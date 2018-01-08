@@ -17,6 +17,8 @@
 package storage
 
 import "github.com/syndtr/goleveldb/leveldb/iterator"
+//duplicate of ethdb.interface
+
 
 // Code using batches should try to add this much data to the batch.
 // The value was determined empirically.

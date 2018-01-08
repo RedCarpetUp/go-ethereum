@@ -43,23 +43,23 @@ import (
 
 // the swarm stack
 type Swarm struct {
-	config      	*api.Config            // swarm configuration
-	api         	*api.Api               // high level api layer (fs/manifest)
-	dns         	api.Resolver           // DNS registrar
-	dbAccess    	*network.DbAccess      // access to local chunk db iterator and storage counter
-	storage     	storage.ChunkStore     // internal access to storage, common interface to cloud storage backends
-	dpa         	*storage.DPA           // distributed preimage archive, the local API to the storage with document level storage/retrieval support
-	depo        	network.StorageHandler // remote request handler, interface between bzz protocol and the storage
-	cloud       	storage.CloudStore     // procurement, cloud storage backend (can multi-cloud)
-	hive        	*network.Hive          // the logistic manager
-	backend     	chequebook.Backend     // simple blockchain Backend
-	privateKey  	*ecdsa.PrivateKey
-	corsString  	string
-	swapEnabled 	bool
-	lstore      	*storage.LocalStore // local store, needs to store for releasing resources after node stopped
-	sfs         	*fuse.SwarmFS       // need this to cleanup all the active mounts on node exit
-	psql        	bool
-	psqlTableName 	string
+	config        *api.Config            // swarm configuration
+	api           *api.Api               // high level api layer (fs/manifest)
+	dns           api.Resolver           // DNS registrar
+	dbAccess      *network.DbAccess      // access to local chunk db iterator and storage counter
+	storage       storage.ChunkStore     // internal access to storage, common interface to cloud storage backends
+	dpa           *storage.DPA           // distributed preimage archive, the local API to the storage with document level storage/retrieval support
+	depo          network.StorageHandler // remote request handler, interface between bzz protocol and the storage
+	cloud         storage.CloudStore     // procurement, cloud storage backend (can multi-cloud)
+	hive          *network.Hive          // the logistic manager
+	backend       chequebook.Backend     // simple blockchain Backend
+	privateKey    *ecdsa.PrivateKey
+	corsString    string
+	swapEnabled   bool
+	lstore        *storage.LocalStore // local store, needs to store for releasing resources after node stopped
+	sfs           *fuse.SwarmFS       // need this to cleanup all the active mounts on node exit
+	psql          bool
+	psqlTableName string
 }
 
 type SwarmAPI struct {

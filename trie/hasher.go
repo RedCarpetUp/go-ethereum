@@ -72,10 +72,7 @@ func (h *hasher) returnCalculator(calculator *calculator) {
 
 // hash collapses a node down into a hash node, also returning a copy of the
 // original node initialized with the computed hash to replace the original one.
-// outerMost bool used to check if the function is at outermost..
-// recursion (used for closing and writing batches in PostgreSQL)
 func (h *hasher) hash(n node, db DatabaseWriter, force bool) (node, node, error) {
-
 	// If we're not storing the node, just hashing, use available cached data
 	if hash, dirty := n.cache(); hash != nil {
 		if db == nil {
@@ -95,6 +92,7 @@ func (h *hasher) hash(n node, db DatabaseWriter, force bool) (node, node, error)
 	var batch ethdb.Batch
 	if outerMost() {
 		//if db is Postgres, make a batch at outermost call to hash()
+		//use same batch when calls are made in recursion
 		_, okPgDatabase := db.(*ethdb.PgSQLDatabase)
 		if okPgDatabase {
 			batch = db.(*ethdb.PgSQLDatabase).NewBatch()
@@ -131,7 +129,8 @@ func (h *hasher) hash(n node, db DatabaseWriter, force bool) (node, node, error)
 	return hashed, cached, nil
 }
 
-//check if the function called is outermost or it is called from recursion
+// outerMost bool used to check if the function is at outermost..
+// recursion (used for closing and writing batches in PostgreSQL)
 func outerMost() bool {
 	pc := make([]uintptr, 2)
 	runtime.Callers(2, pc)                                      //skip: 1 - runtime.Caller, 2 - outer_most itself
