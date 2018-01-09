@@ -248,6 +248,9 @@ func (b *PsqlBatch) Delete(key []byte) {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	sqlStatement := `DELETE FROM ` + b.db.tableName + ` WHERE key = $1;`
 	_, err := b.tx.Exec(sqlStatement, keyBase64)
+	if err != nil {
+		log.Error(err.Error())
+	}
 	b.size += 1
 }
 
