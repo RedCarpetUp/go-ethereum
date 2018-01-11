@@ -52,15 +52,15 @@ func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
 		return nil, err
 	}
 
-	stmtHas, err := db.Prepare(`SELECT count(*) FROM ` + tableName + ` WHERE key = $1;`)
+	stmtHas, err := db.Prepare(`SELECT count(*) FROM ` + tableName + ` WHERE key = $1 AND row_status = TRUE;`)
 	if err != nil {
 		log.Error(err.Error())
 	}
-	stmtGet, err := db.Prepare(`SELECT value FROM ` + tableName + ` WHERE key = $1;`)
+	stmtGet, err := db.Prepare(`SELECT value FROM ` + tableName + ` WHERE key = $1 AND row_status = TRUE;`)
 	if err != nil {
 		log.Error(err.Error())
 	}
-	stmtPut, err := db.Prepare(`INSERT INTO ` + tableName + ` VALUES ($1, $2);`)
+	stmtPut, err := db.Prepare(`INSERT INTO ` + tableName + ` VALUES ($1, $2, TRUE);`)
 	if err != nil {
 		log.Error(err.Error())
 	}
@@ -131,10 +131,9 @@ func EnsureTableExists(tableName string) {
 	if err != nil {
 		panic("could not get a connection:" + err.Error())
 	}
-
-	//_, err = db.Exec(`CREATE TABLE IF NOT EXISTS `+tableName+`(data jsonb)`)
+	//row_status represent if the row is soft-deleted
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS ` + tableName +
-		`(key TEXT, value TEXT)`)
+		`(key TEXT, value TEXT, row_status BOOLEAN DEFAULT TRUE)`)
 	if err != nil {
 		panic("Create table failed :" + err.Error())
 	}
@@ -190,7 +189,7 @@ func (db *PgSQLDatabase) Has(key []byte) (bool, error) {
 
 func (db *PgSQLDatabase) Delete(key []byte) error {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := `DELETE FROM ` + db.tableName + ` WHERE key = $1;`
+	sqlStatement := `UPDATE ` + db.tableName + ` SET row_status = FALSE where key = $1;`
 	_, err := db.db.Exec(sqlStatement, keyBase64)
 	return err
 }
@@ -211,8 +210,7 @@ func (db *PgSQLDatabase) NewBatch() Batch {
 	if err != nil {
 		panic(err)
 	}
-	stmtPut, err := tx.Prepare(pq.CopyIn(db.tableName, "key", "value"))
-	//stmtPut, err := tx.Prepare(`INSERT INTO `+db.tableName+` VALUES ($1)`)
+	stmtPut, err := tx.Prepare(pq.CopyIn(db.tableName, "key", "value", "row_status"))
 	if err != nil {
 		log.Error(err.Error())
 	}
@@ -234,7 +232,7 @@ func (b *PsqlBatch) Put(key []byte, value []byte) error {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	valueBase64 := base64.StdEncoding.EncodeToString(value)
 
-	_, err := b.stmtPut.Exec(keyBase64, valueBase64)
+	_, err := b.stmtPut.Exec(keyBase64, valueBase64, "TRUE")
 	b.size += len(value)
 	return err
 
@@ -242,7 +240,7 @@ func (b *PsqlBatch) Put(key []byte, value []byte) error {
 
 func (b *PsqlBatch) Delete(key []byte) error {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := `DELETE FROM ` + b.db.tableName + ` WHERE key = $1;`
+	sqlStatement := `UPDATE ` + b.db.tableName + ` SET row_status = FALSE where key = $1;`
 	_, err := b.tx.Exec(sqlStatement, keyBase64)
 	b.size += 1
 	return err
@@ -289,7 +287,7 @@ func (i *PgSQLIterator) Error() error {
 func (i *PgSQLIterator) First() bool {
 	var key string
 	var value string
-	sqlStatement := "SELECT * FROM " + i.db.tableName + " ORDER BY key ASC LIMIT 1 OFFSET 0"
+	sqlStatement := "SELECT key, value FROM " + i.db.tableName + " WHERE row_status = TRUE ORDER BY key ASC LIMIT 1 OFFSET 0"
 	err := i.db.db.QueryRow(sqlStatement).Scan(&key, &value)
 	if err != nil {
 		i.err = err
@@ -316,7 +314,7 @@ func (i *PgSQLIterator) Last() bool {
 	var totalString string
 	var totalInt int
 
-	sqlStatementLast := "SELECT count(*) FROM " + i.db.tableName
+	sqlStatementLast := "SELECT count(*) FROM " + i.db.tableName +" WHERE row_status = TRUE;"
 	err := i.db.db.QueryRow(sqlStatementLast).Scan(&totalString)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -335,7 +333,7 @@ func (i *PgSQLIterator) Last() bool {
 	var key string
 	var value string
 
-	sqlStatement2 := "SELECT * FROM " + i.db.tableName + " ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(totalInt-1)
+	sqlStatement2 := "SELECT key,value FROM " + i.db.tableName + " WHERE row_status = TRUE ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(totalInt-1)
 	err = i.db.db.QueryRow(sqlStatement2).Scan(&key, &value)
 	if err != nil {
 		i.err = err
@@ -367,7 +365,7 @@ func (i *PgSQLIterator) Next() bool {
 	var key string
 	var value string
 
-	sqlStatement := "SELECT * FROM " + i.db.tableName + " ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset+1)
+	sqlStatement := "SELECT key,value FROM " + i.db.tableName + " WHERE row_status = TRUE ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset+1)
 	err := i.db.db.QueryRow(sqlStatement).Scan(&key, &value)
 	if err != nil {
 		i.err = err
@@ -394,7 +392,7 @@ func (i *PgSQLIterator) Prev() bool {
 	var key string
 	var value string
 
-	sqlStatement := "SELECT * FROM " + i.db.tableName + " ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset-1)
+	sqlStatement := "SELECT key,value FROM " + i.db.tableName + " WHERE row_status = TRUE ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset-1)
 	err := i.db.db.QueryRow(sqlStatement).Scan(&key, &value)
 	if err != nil {
 		i.err = err
