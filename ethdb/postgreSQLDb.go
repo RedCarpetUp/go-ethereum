@@ -132,7 +132,7 @@ func EnsureTableExists(tableName string) {
 	}
 	//row_status represent if the row is soft-deleted
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS ` + tableName +
-		`(key BYETA, value BYTEA, row_status BOOLEAN DEFAULT TRUE)`)
+		`(key BYTEA, value BYTEA, row_status BOOLEAN DEFAULT TRUE)`)
 	if err != nil {
 		panic("Create table failed :" + err.Error())
 	}
