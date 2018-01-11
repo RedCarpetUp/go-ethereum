@@ -8,7 +8,6 @@ import (
 
 	_ "github.com/lib/pq"
 	"database/sql"
-	"encoding/base64"
 	"github.com/ethereum/go-ethereum/log"
 	"strings"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -134,7 +133,7 @@ func EnsureTableExists(tableName string) {
 	}
 	//row_status represent if the row is soft-deleted
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS ` + tableName +
-		`(key TEXT, value TEXT, row_status BOOLEAN DEFAULT TRUE)`)
+		`(key BYETA, value BYTEA, row_status BOOLEAN DEFAULT TRUE)`)
 	if err != nil {
 		panic("Create table failed :" + err.Error())
 	}
@@ -146,30 +145,23 @@ func EnsureTableExists(tableName string) {
 }
 
 func (db *PgSQLDatabase) Put(key []byte, value []byte) error {
-	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	valueBase64 := base64.StdEncoding.EncodeToString(value)
 	hasKey, err := db.Has(key)
 	if err != nil {
 		return err
 	}
 	if hasKey {
-		_, err := db.stmtUpdate.Exec(keyBase64, valueBase64)
+		_, err := db.stmtUpdate.Exec(key, value)
 		return err
 	} else {
-		_, err := db.stmtPut.Exec(keyBase64, valueBase64)
+		_, err := db.stmtPut.Exec(key, value)
 		return err
 	}
 }
 
 func (db *PgSQLDatabase) Get(key []byte) ([]byte, error) {
-	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	var data string
+	var value []byte
 
-	err := db.stmtGet.QueryRow(keyBase64).Scan(&data)
-	if err != nil {
-		return nil, err
-	}
-	value, err := base64.StdEncoding.DecodeString(data)
+	err := db.stmtGet.QueryRow(key).Scan(&value)
 	if err != nil {
 		return nil, err
 	}
@@ -177,9 +169,8 @@ func (db *PgSQLDatabase) Get(key []byte) ([]byte, error) {
 }
 
 func (db *PgSQLDatabase) Has(key []byte) (bool, error) {
-	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	var numRows int
-	err := db.stmtHas.QueryRow(keyBase64).Scan(&numRows)
+	err := db.stmtHas.QueryRow(key).Scan(&numRows)
 	hasKey := false
 	if numRows != 0 {
 		hasKey = true
@@ -189,9 +180,9 @@ func (db *PgSQLDatabase) Has(key []byte) (bool, error) {
 }
 
 func (db *PgSQLDatabase) Delete(key []byte) error {
-	keyBase64 := base64.StdEncoding.EncodeToString(key)
+	//used soft-delete(set row_status to false)
 	sqlStatement := `UPDATE ` + db.tableName + ` SET row_status = FALSE where key = $1;`
-	_, err := db.db.Exec(sqlStatement, keyBase64)
+	_, err := db.db.Exec(sqlStatement, key)
 	return err
 }
 
@@ -230,10 +221,7 @@ type PsqlBatch struct {
 }
 
 func (b *PsqlBatch) Put(key []byte, value []byte) {
-	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	valueBase64 := base64.StdEncoding.EncodeToString(value)
-
-	_, err := b.stmtPut.Exec(keyBase64, valueBase64, "TRUE")
+	_, err := b.stmtPut.Exec(key, value, "TRUE")
 	if err != nil{
 		log.Error(err.Error())
 	}
@@ -242,9 +230,10 @@ func (b *PsqlBatch) Put(key []byte, value []byte) {
 }
 
 func (b *PsqlBatch) Delete(key []byte) {
-	keyBase64 := base64.StdEncoding.EncodeToString(key)
+	//used soft-delete(set row_status to false)
 	sqlStatement := `UPDATE ` + b.db.tableName + ` SET row_status = FALSE where key = $1;`
-	_, err := b.tx.Exec(sqlStatement, keyBase64)
+	_, err := b.tx.Exec(sqlStatement, key)
+	b.size += 1
 	if err != nil {
 		log.Error(err.Error())
 	}
@@ -290,8 +279,8 @@ func (i *PgSQLIterator) Error() error {
 }
 
 func (i *PgSQLIterator) First() bool {
-	var key string
-	var value string
+	var key []byte
+	var value []byte
 	sqlStatement := "SELECT key, value FROM " + i.db.tableName + " WHERE row_status = TRUE ORDER BY key ASC LIMIT 1 OFFSET 0"
 	err := i.db.db.QueryRow(sqlStatement).Scan(&key, &value)
 	if err != nil {
@@ -299,18 +288,8 @@ func (i *PgSQLIterator) First() bool {
 		return false
 	}
 
-	keyDecoded, err := base64.StdEncoding.DecodeString(key)
-	if err != nil {
-		i.err = err
-		return false
-	}
-	valueDecoded, err := base64.StdEncoding.DecodeString(value)
-	if err != nil {
-		i.err = err
-		return false
-	}
-	i.key = []byte(keyDecoded)
-	i.value = []byte(valueDecoded)
+	i.key = key
+	i.value = value
 	i.offset = 0
 	return true
 }
@@ -335,8 +314,8 @@ func (i *PgSQLIterator) Last() bool {
 		return false
 	}
 
-	var key string
-	var value string
+	var key []byte
+	var value []byte
 
 	sqlStatement2 := "SELECT key,value FROM " + i.db.tableName + " WHERE row_status = TRUE ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(totalInt-1)
 	err = i.db.db.QueryRow(sqlStatement2).Scan(&key, &value)
@@ -345,18 +324,8 @@ func (i *PgSQLIterator) Last() bool {
 		return false
 	}
 
-	keyDecoded, err := base64.StdEncoding.DecodeString(key)
-	if err != nil {
-		i.err = err
-		return false
-	}
-	valueDecoded, err := base64.StdEncoding.DecodeString(value)
-	if err != nil {
-		i.err = err
-		return false
-	}
-	i.key = []byte(keyDecoded)
-	i.value = []byte(valueDecoded)
+	i.key = key
+	i.value = value
 
 	i.offset, err = strconv.Atoi(strconv.Itoa(totalInt - 1))
 	if err != nil {
@@ -367,8 +336,8 @@ func (i *PgSQLIterator) Last() bool {
 }
 
 func (i *PgSQLIterator) Next() bool {
-	var key string
-	var value string
+	var key []byte
+	var value []byte
 
 	sqlStatement := "SELECT key,value FROM " + i.db.tableName + " WHERE row_status = TRUE ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset+1)
 	err := i.db.db.QueryRow(sqlStatement).Scan(&key, &value)
@@ -377,25 +346,15 @@ func (i *PgSQLIterator) Next() bool {
 		return false
 	}
 
-	keyDecoded, err := base64.StdEncoding.DecodeString(key)
-	if err != nil {
-		i.err = err
-		return false
-	}
-	valueDecoded, err := base64.StdEncoding.DecodeString(value)
-	if err != nil {
-		i.err = err
-		return false
-	}
-	i.key = []byte(keyDecoded)
-	i.value = []byte(valueDecoded)
+	i.key = key
+	i.value = value
 	i.offset += 1
 	return true
 }
 
 func (i *PgSQLIterator) Prev() bool {
-	var key string
-	var value string
+	var key []byte
+	var value []byte
 
 	sqlStatement := "SELECT key,value FROM " + i.db.tableName + " WHERE row_status = TRUE ORDER BY key ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset-1)
 	err := i.db.db.QueryRow(sqlStatement).Scan(&key, &value)
@@ -404,30 +363,19 @@ func (i *PgSQLIterator) Prev() bool {
 		return false
 	}
 
-	keyDecoded, err := base64.StdEncoding.DecodeString(key)
-	if err != nil {
-		i.err = err
-		return false
-	}
-	valueDecoded, err := base64.StdEncoding.DecodeString(value)
-	if err != nil {
-		i.err = err
-		return false
-	}
-	i.key = []byte(keyDecoded)
-	i.value = []byte(valueDecoded)
+	i.key = key
+	i.value = value
 
 	i.offset -= 1
 	return true
 }
 
 func (i *PgSQLIterator) Seek(key []byte) bool {
-	var value string
+	var value []byte
 	var indexString string
 
-	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := "SELECT value, index FROM (SELECT key, value, row_number() OVER(ORDER BY key ASC) AS INDEX FROM " + i.db.tableName + ") As data WHERE key = '" + keyBase64 + "';"
-	err := i.db.db.QueryRow(sqlStatement).Scan(&value, &indexString)
+	sqlStatement := "SELECT value, index FROM (SELECT key, value, row_number() OVER(ORDER BY key ASC) AS INDEX FROM " + i.db.tableName + ") As data WHERE key = $1;"
+	err := i.db.db.QueryRow(sqlStatement,key).Scan(&value, &indexString)
 
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
@@ -437,13 +385,8 @@ func (i *PgSQLIterator) Seek(key []byte) bool {
 		return false
 	}
 
-	valueDecoded, err := base64.StdEncoding.DecodeString(value)
-	if err != nil {
-		i.err = err
-		return false
-	}
 	i.key = key
-	i.value = []byte(valueDecoded)
+	i.value = value
 	indexInt, err := strconv.Atoi(indexString)
 	i.offset = indexInt - 1
 	if err != nil {
