@@ -80,7 +80,7 @@ func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
 }
 
 //check if database exists, if not create it
-func EnsureDatabaseExists() {
+func EnsureDatabaseExists(dbname string) {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s sslmode=disable",
 		host, port, user, password)
@@ -97,7 +97,7 @@ func EnsureDatabaseExists() {
 	}
 
 	//database exists if res.RowsAffected() returns 1, does not exists if returns 0
-	res, err := db.Exec("SELECT 1 FROM pg_database WHERE datname = 'psql_eth';")
+	res, err := db.Exec("SELECT 1 FROM pg_database WHERE datname = '"+dbname+"';")
 	if err != nil {
 		panic(err)
 	}
@@ -106,7 +106,7 @@ func EnsureDatabaseExists() {
 		panic(err)
 	}
 	if exists == 0 {
-		_, err := db.Exec("CREATE DATABASE psql_eth")
+		_, err := db.Exec("CREATE DATABASE "+dbname)
 		if err != nil {
 			panic(err)
 		}

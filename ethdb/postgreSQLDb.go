@@ -96,7 +96,7 @@ func EnsureDatabaseExists() {
 	}
 
 	//database exists if res.RowsAffected() returns 1, does not exists if returns 0
-	res, err := db.Exec("SELECT 1 FROM pg_database WHERE datname = 'psql_eth';")
+	res, err := db.Exec("SELECT 1 FROM pg_database WHERE datname = '"+dbname+"';")
 	if err != nil {
 		panic(err)
 	}
@@ -105,7 +105,7 @@ func EnsureDatabaseExists() {
 		panic(err)
 	}
 	if exists == 0 {
-		_, err := db.Exec("CREATE DATABASE psql_eth")
+		_, err := db.Exec("CREATE DATABASE "+dbname)
 		if err != nil {
 			panic(err)
 		}
@@ -252,9 +252,10 @@ func (b *PsqlBatch) ValueSize() int {
 }
 
 func (db *PgSQLDatabase) NewIterator() iterator.Iterator {
+	log.Info("New iterator ethdb")
 	return &PgSQLIterator{
 		offset: 0,
-		key:    make([]byte, 0),
+		key:   make([]byte, 0),
 		value:  make([]byte, 0),
 		db:     db,
 	}
