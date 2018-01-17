@@ -10,6 +10,38 @@ https://camo.githubusercontent.com/915b7be44ada53c290eb157634330494ebe3e30a/6874
 Automated builds are available for stable releases and the unstable master branch.
 Binary archives are published at https://geth.ethereum.org/downloads/.
 
+### Building from source and running with PostgreSQL as default database
+Clone the repository to a directory of your choosing:
+```
+git clone https://github.com/RedCarpetUp/go-ethereum.git
+```
+Install latest distribution of Go (v1.7) if you don't have it already:
+
+[See instructions](https://github.com/ethereum/go-ethereum/wiki/Installing-Go#ubuntu-1404)
+
+Building geth requires Go and C compilers to be installed:
+```
+sudo apt-get install -y build-essential golang
+```
+Checkout branch `dev`-
+```
+cd go-ethereum
+git checkout dev
+```
+Finally, build the geth program using the following command.
+```
+make geth
+```
+Start geth on testnet using PostgreSQL as default database
+Should be run from directory `go-ethereum`
+```
+$ ./build/bin/geth --psql --psqlTableName "psqlTestnet" --testnet
+```
+Here `--psql ` flag is to select PostgreSQL as default database, and `--psqlTableName` to give tableName in Postgres (tableName 'psqlTestnet' just an example here)
+##### Note
+The database ip, username, password are hardcoded at present. To modify the details, change the `host, port, user, password, dbname` constants in `ethdb/postgreSQLDb.go, swarm/storage/postgreSQLDb.go`
+
+
 ## Building the source
 
 For prerequisites and detailed build instructions please read the
