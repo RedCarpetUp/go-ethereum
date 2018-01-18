@@ -80,7 +80,7 @@ func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
 }
 
 //check if database exists, if not create it
-func EnsureDatabaseExists(dbname string) {
+func EnsureDatabaseExists() {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s sslmode=disable",
 		host, port, user, password)
