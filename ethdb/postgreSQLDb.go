@@ -22,7 +22,7 @@ const (
 	port     = 5432
 	user     = "postgres"
 	password = "vvkaExD1rCerkG4F"
-	dbname   = "test_db"
+	dbname   = "psql_eth"
 )
 
 type PgSQLDatabase struct {
@@ -50,11 +50,11 @@ func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
 		return nil, err
 	}
 
-	stmtHas, err := db.Prepare(`SELECT COUNT(data) FROM ` + tableName + ` WHERE data->>'key'=$1;`)
+	stmtHas, err := db.Prepare(`SELECT COUNT(data) FROM ` + tableName + ` WHERE data->>'key'=$1 AND row_status = TRUE;`)
 	if err != nil {
 		log.Error(err.Error())
 	}
-	stmtGet, err := db.Prepare(`SELECT data->>'value' FROM ` + tableName + ` WHERE data->>'key'=$1;`)
+	stmtGet, err := db.Prepare(`SELECT data->>'value' FROM ` + tableName + ` WHERE data->>'key'=$1 AND row_status = TRUE;`)
 	if err != nil {
 		log.Error(err.Error())
 	}
@@ -129,8 +129,8 @@ func EnsureTableExists(tableName string) {
 	if err != nil {
 		panic("could not get a connection:" + err.Error())
 	}
-
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS ` + tableName + `(data jsonb)`)
+	//row_status represent if the row is soft-deleted
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS ` + tableName + `(data jsonb, row_status BOOLEAN DEFAULT TRUE)`)
 	if err != nil {
 		panic("Create table failed :" + err.Error())
 	}
@@ -183,8 +183,9 @@ func (db *PgSQLDatabase) Has(key []byte) (bool, error) {
 }
 
 func (db *PgSQLDatabase) Delete(key []byte) error {
+	//used soft-delete(set row_status to false)
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := `DELETE FROM ` + db.tableName + ` WHERE data->>'key'=$1;`
+	sqlStatement := `UPDATE ` + db.tableName + ` SET row_status = FALSE WHERE data->>'key'=$1;`
 	_, err := db.db.Exec(sqlStatement, keyBase64)
 	return err
 }
@@ -205,7 +206,7 @@ func (db *PgSQLDatabase) NewBatch() Batch {
 	if err != nil {
 		panic(err)
 	}
-	stmtPut, err := tx.Prepare(pq.CopyIn(db.tableName, "data"))
+	stmtPut, err := tx.Prepare(pq.CopyIn(db.tableName, "data", "row_status"))
 	if err != nil {
 		log.Error(err.Error())
 	}
@@ -233,8 +234,9 @@ func (b *PsqlBatch) Put(key []byte, value []byte) error {
 }
 
 func (b *PsqlBatch) Delete(key []byte) error {
+	//used soft-delete(set row_status to false)
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
-	sqlStatement := `DELETE FROM ` + b.db.tableName + ` WHERE data->>'key' = $1;`
+	sqlStatement := `UPDATE ` + b.db.tableName + ` SET row_status = FALSE WHERE data->>'key' = $1;`
 	_, err := b.tx.Exec(sqlStatement, keyBase64)
 	b.size += 1
 	return err
@@ -281,7 +283,7 @@ func (i *PgSQLIterator) Error() error {
 func (i *PgSQLIterator) First() bool {
 	var rowString string
 	var jsonMap map[string]string
-	sqlStatement := "SELECT * FROM " + i.db.tableName + " ORDER BY data ASC LIMIT 1 OFFSET 0"
+	sqlStatement := "SELECT * FROM " + i.db.tableName + "WHERE row_status = TRUE ORDER BY data ASC LIMIT 1 OFFSET 0"
 	err := i.db.db.QueryRow(sqlStatement).Scan(&rowString)
 	if err != nil {
 		i.err = err
@@ -314,7 +316,7 @@ func (i *PgSQLIterator) Last() bool {
 	var totalString string
 	var totalInt int
 
-	sqlStatementLast := "SELECT count(*) FROM " + i.db.tableName
+	sqlStatementLast := "SELECT count(*) FROM " + i.db.tableName + " WHERE row_status = TRUE;"
 	err := i.db.db.QueryRow(sqlStatementLast).Scan(&totalString)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -332,7 +334,7 @@ func (i *PgSQLIterator) Last() bool {
 
 	var rowString string
 	var jsonMap map[string]string
-	sqlStatement2 := "SELECT * FROM " + i.db.tableName + " ORDER BY data ASC LIMIT 1 OFFSET " + strconv.Itoa(totalInt-1)
+	sqlStatement2 := "SELECT * FROM " + i.db.tableName + " WHERE row_status = TRUE ORDER BY data ASC LIMIT 1 OFFSET " + strconv.Itoa(totalInt-1)
 	err = i.db.db.QueryRow(sqlStatement2).Scan(&rowString)
 	if err != nil {
 		i.err = err
@@ -371,7 +373,7 @@ func (i *PgSQLIterator) Next() bool {
 	var rowString string
 	var jsonMap map[string]string
 
-	sqlStatement := "SELECT * FROM " + i.db.tableName + " ORDER BY data ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset+1)
+	sqlStatement := "SELECT * FROM " + i.db.tableName + " WHERE row_status = TRUE ORDER BY data ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset+1)
 	err := i.db.db.QueryRow(sqlStatement).Scan(&rowString)
 	if err != nil {
 		i.err = err
@@ -404,7 +406,7 @@ func (i *PgSQLIterator) Prev() bool {
 	var rowString string
 	var jsonMap map[string]string
 
-	sqlStatement := "SELECT * FROM " + i.db.tableName + " ORDER BY data ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset-1)
+	sqlStatement := "SELECT * FROM " + i.db.tableName + "  WHERE row_status = TRUE ORDER BY data ASC LIMIT 1 OFFSET " + strconv.Itoa(i.offset-1)
 	err := i.db.db.QueryRow(sqlStatement).Scan(&rowString)
 	if err != nil {
 		i.err = err
