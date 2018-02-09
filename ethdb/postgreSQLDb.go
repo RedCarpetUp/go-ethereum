@@ -58,7 +58,7 @@ func NewPostgreSQLDb(tableName string) (*PgSQLDatabase, error) {
 	if err != nil {
 		log.Error(err.Error())
 	}
-	stmtPut, err := db.Prepare(`INSERT INTO ` + tableName + ` VALUES ($1);`)
+	stmtPut, err := db.Prepare(`INSERT INTO ` + tableName + ` VALUES ($1, True);`)
 	if err != nil {
 		log.Error(err.Error())
 	}
@@ -84,29 +84,29 @@ func EnsureDatabaseExists(dbname string) {
 		host, port, user, password)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		panic("could not get a connection:" + err.Error())
+		log.Error("could not get a connection:" + err.Error())
 	}
 
 	defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
-		panic("could not get a connection:" + err.Error())
+		log.Error("could not get a connection:" + err.Error())
 	}
 
 	//database exists if res.RowsAffected() returns 1, does not exists if returns 0
 	res, err := db.Exec("SELECT 1 FROM pg_database WHERE datname = '" + dbname + "';")
 	if err != nil {
-		panic(err)
+		log.Error(err.Error())
 	}
 	exists, err := res.RowsAffected()
 	if err != nil {
-		panic(err)
+		log.Error(err.Error())
 	}
 	if exists == 0 {
 		_, err := db.Exec("CREATE DATABASE " + dbname)
 		if err != nil {
-			panic(err)
+			log.Error(err.Error())
 		}
 		log.Info("created db")
 	}
@@ -120,23 +120,23 @@ func EnsureTableExists(tableName string) {
 		host, port, user, password, dbname)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		panic("Could not get a connection:" + err.Error())
+		log.Error("Could not get a connection:" + err.Error())
 	}
 
 	defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
-		panic("could not get a connection:" + err.Error())
+		log.Error("could not get a connection:" + err.Error())
 	}
 	//row_status represent if the row is soft-deleted
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS ` + tableName + `(data jsonb, row_status BOOLEAN DEFAULT TRUE)`)
 	if err != nil {
-		panic("Create table failed :" + err.Error())
+		log.Error("Create table failed :" + err.Error())
 	}
 	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS ` + tableName + `_index ON ` + tableName + `((data->>'key'));`)
 	if err != nil {
-		panic("Create index failed :" + err.Error())
+		log.Error("Create index failed :" + err.Error())
 	}
 }
 
@@ -193,7 +193,7 @@ func (db *PgSQLDatabase) Delete(key []byte) error {
 func (db *PgSQLDatabase) Close() {
 	err := db.db.Close()
 	if err != nil {
-		panic(err)
+		log.Error(err.Error())
 	}
 }
 
@@ -204,7 +204,7 @@ func (self *PgSQLDatabase) Write(batch *PsqlBatch) error {
 func (db *PgSQLDatabase) NewBatch() Batch {
 	tx, err := db.db.Begin()
 	if err != nil {
-		panic(err)
+		log.Error(err.Error())
 	}
 	stmtPut, err := tx.Prepare(pq.CopyIn(db.tableName, "data", "row_status"))
 	if err != nil {
@@ -227,7 +227,7 @@ type PsqlBatch struct {
 func (b *PsqlBatch) Put(key []byte, value []byte) error {
 	keyBase64 := base64.StdEncoding.EncodeToString(key)
 	valueBase64 := base64.StdEncoding.EncodeToString(value)
-	_, err := b.stmtPut.Exec("{\"key\": \"" + keyBase64 + "\", \"value\" :\"" + valueBase64 + "\"}")
+	_, err := b.stmtPut.Exec("{\"key\": \"" + keyBase64 + "\", \"value\" :\"" + valueBase64 + "\"}", true)
 	b.size += len(value)
 	return err
 

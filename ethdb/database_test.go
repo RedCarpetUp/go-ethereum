@@ -291,10 +291,13 @@ func testPutGetPostgresBatch(b ethdb.Batch, db ethdb.Database, t *testing.T) {
 	for _, v := range test_values {
 		err := b.Put([]byte(v), []byte(v))
 		if err != nil {
-			t.Fatalf("put failed: %v", err)
+			t.Fatalf("batch put failed: %v", err)
 		}
 	}
-	b.Write()
+	err := b.Write()
+	if err != nil {
+		t.Fatalf("batch write failed: %v", err)
+	}
 
 	for _, v := range test_values {
 		data, err := db.Get([]byte(v))
